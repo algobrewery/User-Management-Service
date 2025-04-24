@@ -2,6 +2,7 @@ package com.userapi.controller;
 
 import com.userapi.dto.CreateUserRequest;
 import com.userapi.dto.CreateUserResponse;
+import com.userapi.dto.GetUserResponse;
 import com.userapi.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -33,4 +34,12 @@ public class UserController {
         CreateUserResponse response = userService.createUser(request, orgUuid);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
+
+    @GetMapping("/{jobProfileUuid}")
+    public ResponseEntity<GetUserResponse> getUserByJobProfileId(
+            @PathVariable String jobProfileUuid) {
+
+        GetUserResponse response = userService.getUserByJobProfileId(jobProfileUuid);
+        return ResponseEntity.ok(response);
+}
 }

@@ -2,7 +2,9 @@ package com.userapi.dto;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
+import java.util.List;
 
 public class CreateUserRequest {
     @NotBlank(message = "Username is required")
@@ -25,8 +27,8 @@ public class CreateUserRequest {
     private EmailInfo emailInfo;
 
     @Valid
-    @NotNull(message = "Employment information is required")
-    private EmploymentInfo employmentInfo;
+    @NotEmpty(message = "At least one employment information is required")
+    private List<EmploymentInfo> employmentInfo;
 
     // Getters and Setters
     public String getUsername() {
@@ -77,11 +79,11 @@ public class CreateUserRequest {
         this.emailInfo = emailInfo;
     }
 
-    public EmploymentInfo getEmploymentInfo() {
+    public List<EmploymentInfo> getEmploymentInfo() {
         return employmentInfo;
     }
 
-    public void setEmploymentInfo(EmploymentInfo employmentInfo) {
+    public void setEmploymentInfo(List<EmploymentInfo> employmentInfo) {
         this.employmentInfo = employmentInfo;
     }
 }

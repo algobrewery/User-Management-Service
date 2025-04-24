@@ -10,6 +10,8 @@ public class EmploymentInfo {
     @NotNull(message = "Start date is required")
     private LocalDateTime startDate;
 
+    private LocalDateTime endDate;
+
     @NotBlank(message = "Job title is required")
     private String jobTitle;
 
@@ -27,6 +29,14 @@ public class EmploymentInfo {
 
     public void setStartDate(LocalDateTime startDate) {
         this.startDate = startDate;
+    }
+
+    public LocalDateTime getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDateTime endDate) {
+        this.endDate = endDate;
     }
 
     public String getJobTitle() {
