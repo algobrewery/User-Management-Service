@@ -35,11 +35,11 @@ public class UserController {
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
-    @GetMapping("/{jobProfileUuid}")
-    public ResponseEntity<GetUserResponse> getUserByJobProfileId(
-            @PathVariable String jobProfileUuid) {
+    @GetMapping("/{userId}")
+    public ResponseEntity<GetUserResponse> getUserById(
+            @PathVariable String userId) {
 
-        GetUserResponse response = userService.getUserByJobProfileId(jobProfileUuid);
+        GetUserResponse response = userService.getUserById(userId);
         return ResponseEntity.ok(response);
-}
+    }
 }
