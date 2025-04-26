@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
 
+import static com.userapi.common.constants.HeaderConstants.*;
+
 @RestController
 @RequestMapping("/user")
 public class UserController {
@@ -24,14 +26,14 @@ public class UserController {
 
     @PostMapping
     public ResponseEntity<CreateUserResponse> createUser(
-            @RequestHeader("x-app-org-uuid") String orgUuid,
-            @RequestHeader("x-app-user-uuid") String userUuid,
-            @RequestHeader("x-app-client-user-session-uuid") String sessionUuid,
-            @RequestHeader("x-app-trace-id") String traceId,
-            @RequestHeader("x-app-region-id") String regionId,
+            @RequestHeader(APP_ORG_UUID) String orgUUID,
+            @RequestHeader(APP_USER_UUID) String userUUID,
+            @RequestHeader(APP_CLIENT_USER_SESSION_UUID) String clientUserSessionUUID,
+            @RequestHeader(APP_TRACE_ID) String traceID,
+            @RequestHeader(APP_REGION_ID) String regionID,
             @Valid @RequestBody CreateUserRequest request) {
 
-        CreateUserResponse response = userService.createUser(request, orgUuid);
+        CreateUserResponse response = userService.createUser(request, orgUUID);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
