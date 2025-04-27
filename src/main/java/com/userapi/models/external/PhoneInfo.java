@@ -1,4 +1,4 @@
-package com.userapi.dto;
+package com.userapi.models.external;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;

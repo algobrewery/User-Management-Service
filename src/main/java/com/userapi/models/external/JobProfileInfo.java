@@ -1,10 +1,10 @@
-package com.userapi.dto;
+package com.userapi.models.external;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDateTime;
 import java.util.List;
 
-public class JobProfileDTO {
+public class JobProfileInfo {
     private String jobTitle;
     private LocalDateTime startDate;
     private LocalDateTime endDate;

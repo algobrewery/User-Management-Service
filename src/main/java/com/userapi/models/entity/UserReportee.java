@@ -1,4 +1,4 @@
-package com.userapi.entity;
+package com.userapi.models.entity;
 
 import javax.persistence.*;
 

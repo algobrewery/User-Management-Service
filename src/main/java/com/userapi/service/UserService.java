@@ -2,12 +2,12 @@ package com.userapi.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.userapi.dto.*;
-import com.userapi.entity.JobProfile;
-import com.userapi.entity.UserProfile;
-import com.userapi.entity.UserReportee;
+import com.userapi.models.entity.JobProfile;
+import com.userapi.models.entity.UserProfile;
+import com.userapi.models.entity.UserReportee;
 import com.userapi.exception.DuplicateResourceException;
 import com.userapi.exception.ResourceNotFoundException;
+import com.userapi.models.external.*;
 import com.userapi.repository.JobProfileRepository;
 import com.userapi.repository.UserProfileRepository;
 import com.userapi.repository.UserReporteeRepository;
@@ -164,7 +164,7 @@ public class UserService {
                 .orElse(allJobProfiles.isEmpty() ? null : allJobProfiles.get(0));
 
         if (current != null) {
-            JobProfileDTO currentProfileDTO = convertToJobProfileDTO(current);
+            JobProfileInfo currentProfileDTO = convertToJobProfileDTO(current);
 
             // Find reportees for the current job profile
             List<UserReportee> reporteeRelations = userReporteeRepository.findByManagerUserUuid(user.getUserUuid());
@@ -176,7 +176,7 @@ public class UserService {
             response.setCurrentJobProfile(currentProfileDTO);
         }
 
-        List<JobProfileDTO> previous = allJobProfiles.stream()
+        List<JobProfileInfo> previous = allJobProfiles.stream()
                 .filter(jp -> current == null
                         ? jp.getEndDate() != null
                         : !jp.getJobProfileUuid().equals(current.getJobProfileUuid()) && jp.getEndDate() != null)
@@ -184,7 +184,7 @@ public class UserService {
                 .collect(Collectors.toList());
 
         // For each previous job profile, find the reportees
-        for (JobProfileDTO prevProfile : previous) {
+        for (JobProfileInfo prevProfile : previous) {
             String jobProfileId = null;
             // Find the job profile ID by matching the profile details
             for (JobProfile jp : allJobProfiles) {
@@ -216,8 +216,8 @@ public class UserService {
         return "+" + user.getPhoneCountryCode() + user.getPhone();
     }
 
-    private JobProfileDTO convertToJobProfileDTO(JobProfile jobProfile) {
-        JobProfileDTO dto = new JobProfileDTO();
+    private JobProfileInfo convertToJobProfileDTO(JobProfile jobProfile) {
+        JobProfileInfo dto = new JobProfileInfo();
         dto.setJobTitle(jobProfile.getTitle());
         dto.setStartDate(jobProfile.getStartDate());
         dto.setEndDate(jobProfile.getEndDate());

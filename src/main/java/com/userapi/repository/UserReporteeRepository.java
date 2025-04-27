@@ -1,6 +1,6 @@
 package com.userapi.repository;
 
-import com.userapi.entity.UserReportee;
+import com.userapi.models.entity.UserReportee;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

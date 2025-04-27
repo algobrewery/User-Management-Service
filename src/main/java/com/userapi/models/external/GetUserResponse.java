@@ -1,4 +1,4 @@
-package com.userapi.dto;
+package com.userapi.models.external;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,8 +14,8 @@ public class GetUserResponse {
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private String status;
-    private JobProfileDTO currentJobProfile;
-    private List<JobProfileDTO> previousJobProfiles;
+    private JobProfileInfo currentJobProfile;
+    private List<JobProfileInfo> previousJobProfiles;
 
     // Getters and Setters
     public String getUserId() {
@@ -98,19 +98,19 @@ public class GetUserResponse {
         this.status = status;
     }
 
-    public JobProfileDTO getCurrentJobProfile() {
+    public JobProfileInfo getCurrentJobProfile() {
         return currentJobProfile;
     }
 
-    public void setCurrentJobProfile(JobProfileDTO currentJobProfile) {
+    public void setCurrentJobProfile(JobProfileInfo currentJobProfile) {
         this.currentJobProfile = currentJobProfile;
     }
 
-    public List<JobProfileDTO> getPreviousJobProfiles() {
+    public List<JobProfileInfo> getPreviousJobProfiles() {
         return previousJobProfiles;
     }
 
-    public void setPreviousJobProfiles(List<JobProfileDTO> previousJobProfiles) {
+    public void setPreviousJobProfiles(List<JobProfileInfo> previousJobProfiles) {
         this.previousJobProfiles = previousJobProfiles;
     }
 }

@@ -1,4 +1,4 @@
-package com.userapi.dto;
+package com.userapi.models.external;
 
 import com.fasterxml.jackson.databind.JsonNode;
 

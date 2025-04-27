@@ -1,4 +1,4 @@
-package com.userapi.entity;
+package com.userapi.models.entity;
 
 import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
 import org.hibernate.annotations.Type;

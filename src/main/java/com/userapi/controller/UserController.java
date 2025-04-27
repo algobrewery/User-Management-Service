@@ -1,8 +1,8 @@
 package com.userapi.controller;
 
-import com.userapi.dto.CreateUserRequest;
-import com.userapi.dto.CreateUserResponse;
-import com.userapi.dto.GetUserResponse;
+import com.userapi.models.external.CreateUserRequest;
+import com.userapi.models.external.CreateUserResponse;
+import com.userapi.models.external.GetUserResponse;
 import com.userapi.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
