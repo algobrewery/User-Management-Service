@@ -1,12 +1,18 @@
 package com.userapi.models.external;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 import java.util.List;
 
+@Setter
+@Getter
 public class CreateUserRequest {
+
     @NotBlank(message = "Username is required")
     private String username;
 
@@ -30,60 +36,4 @@ public class CreateUserRequest {
     @NotEmpty(message = "At least one employment information is required")
     private List<EmploymentInfo> employmentInfo;
 
-    // Getters and Setters
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getFirstName() {
-        return firstName;
-    }
-
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
-
-    public String getMiddleName() {
-        return middleName;
-    }
-
-    public void setMiddleName(String middleName) {
-        this.middleName = middleName;
-    }
-
-    public String getLastName() {
-        return lastName;
-    }
-
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
-
-    public PhoneInfo getPhoneInfo() {
-        return phoneInfo;
-    }
-
-    public void setPhoneInfo(PhoneInfo phoneInfo) {
-        this.phoneInfo = phoneInfo;
-    }
-
-    public EmailInfo getEmailInfo() {
-        return emailInfo;
-    }
-
-    public void setEmailInfo(EmailInfo emailInfo) {
-        this.emailInfo = emailInfo;
-    }
-
-    public List<EmploymentInfo> getEmploymentInfo() {
-        return employmentInfo;
-    }
-
-    public void setEmploymentInfo(List<EmploymentInfo> employmentInfo) {
-        this.employmentInfo = employmentInfo;
-    }
 }
