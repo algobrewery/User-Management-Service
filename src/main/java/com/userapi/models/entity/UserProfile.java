@@ -2,6 +2,8 @@ package com.userapi.models.entity;
 
 import com.vladmihalcea.hibernate.type.array.StringArrayType;
 import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.Type;
 import org.hibernate.annotations.TypeDef;
 import org.hibernate.annotations.TypeDefs;
@@ -15,6 +17,8 @@ import java.time.LocalDateTime;
         @TypeDef(name = "string-array", typeClass = StringArrayType.class),
         @TypeDef(name = "jsonb", typeClass = JsonBinaryType.class)
 })
+@Getter
+@Setter
 public class UserProfile {
 
     @Id
@@ -64,124 +68,4 @@ public class UserProfile {
     @Column(name = "status", nullable = false)
     private String status;
 
-    // Getters and Setters
-    public String getUserUuid() {
-        return userUuid;
-    }
-
-    public void setUserUuid(String userUuid) {
-        this.userUuid = userUuid;
-    }
-
-    public String getOrganizationUuid() {
-        return organizationUuid;
-    }
-
-    public void setOrganizationUuid(String organizationUuid) {
-        this.organizationUuid = organizationUuid;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getFirstName() {
-        return firstName;
-    }
-
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
-
-    public String getMiddleName() {
-        return middleName;
-    }
-
-    public void setMiddleName(String middleName) {
-        this.middleName = middleName;
-    }
-
-    public String getLastName() {
-        return lastName;
-    }
-
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
-
-    public LocalDateTime getStartDate() {
-        return startDate;
-    }
-
-    public void setStartDate(LocalDateTime startDate) {
-        this.startDate = startDate;
-    }
-
-    public LocalDateTime getEndDate() {
-        return endDate;
-    }
-
-    public void setEndDate(LocalDateTime endDate) {
-        this.endDate = endDate;
-    }
-
-    public String[] getJobProfileUuids() {
-        return jobProfileUuids;
-    }
-
-    public void setJobProfileUuids(String[] jobProfileUuids) {
-        this.jobProfileUuids = jobProfileUuids;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getEmailVerificationStatus() {
-        return emailVerificationStatus;
-    }
-
-    public void setEmailVerificationStatus(String emailVerificationStatus) {
-        this.emailVerificationStatus = emailVerificationStatus;
-    }
-
-    public String getPhone() {
-        return phone;
-    }
-
-    public void setPhone(String phone) {
-        this.phone = phone;
-    }
-
-    public Integer getPhoneCountryCode() {
-        return phoneCountryCode;
-    }
-
-    public void setPhoneCountryCode(Integer phoneCountryCode) {
-        this.phoneCountryCode = phoneCountryCode;
-    }
-
-    public String getPhoneVerificationStatus() {
-        return phoneVerificationStatus;
-    }
-
-    public void setPhoneVerificationStatus(String phoneVerificationStatus) {
-        this.phoneVerificationStatus = phoneVerificationStatus;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
 }
