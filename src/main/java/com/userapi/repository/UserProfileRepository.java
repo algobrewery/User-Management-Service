@@ -11,9 +11,6 @@ import java.util.List;
 @Repository
 public interface UserProfileRepository extends JpaRepository<UserProfile, String> {
 
-    boolean existsByUsername(String username);
-    boolean existsByEmail(String email);
-    boolean existsByPhone(String phone);
 
     @Query("SELECT u FROM UserProfile u WHERE u.username = :username OR u.email = :email OR u.phone = :phone")
     List<UserProfile> findConflictingUsers(@Param("username") String username,
