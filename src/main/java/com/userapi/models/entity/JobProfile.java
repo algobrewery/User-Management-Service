@@ -9,13 +9,22 @@ import org.hibernate.annotations.TypeDef;
 import javax.persistence.*;
 import java.time.LocalDateTime;
 
+import lombok.*;
+import org.hibernate.annotations.Type;
+import org.hibernate.annotations.TypeDef;
+import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
+
+import javax.persistence.*;
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "job_profiles")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @TypeDef(name = "jsonb", typeClass = JsonBinaryType.class)
-@Getter
-@Setter
 public class JobProfile {
-
     @Id
     @Column(name = "job_profile_uuid")
     private String jobProfileUuid;
@@ -41,5 +50,4 @@ public class JobProfile {
     @Type(type = "jsonb")
     @Column(name = "extensions_data", columnDefinition = "jsonb")
     private String extensionsData;
-
 }
