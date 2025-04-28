@@ -2,8 +2,7 @@ package com.userapi.models.entity;
 
 import com.vladmihalcea.hibernate.type.array.StringArrayType;
 import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 import org.hibernate.annotations.Type;
 import org.hibernate.annotations.TypeDef;
 import org.hibernate.annotations.TypeDefs;
@@ -13,14 +12,12 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "user_profiles")
-@TypeDefs({
-        @TypeDef(name = "string-array", typeClass = StringArrayType.class),
-        @TypeDef(name = "jsonb", typeClass = JsonBinaryType.class)
-})
-@Getter
-@Setter
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@TypeDef(name = "string-array", typeClass = StringArrayType.class)
 public class UserProfile {
-
     @Id
     @Column(name = "user_uuid")
     private String userUuid;
@@ -67,5 +64,4 @@ public class UserProfile {
 
     @Column(name = "status", nullable = false)
     private String status;
-
 }
