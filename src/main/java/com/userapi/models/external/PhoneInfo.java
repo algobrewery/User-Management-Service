@@ -1,13 +1,16 @@
 package com.userapi.models.external;
 
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 
-@Getter
-@Setter
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
+
+@Data
 public class PhoneInfo {
     @NotBlank(message = "Phone number is required")
     private String number;
@@ -15,6 +18,6 @@ public class PhoneInfo {
     @NotNull(message = "Country code is required")
     private Integer countryCode;
 
+    @NotBlank(message = "Verification status is required")
     private String verificationStatus;
-
 }
