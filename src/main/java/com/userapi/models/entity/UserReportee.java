@@ -5,12 +5,17 @@ import lombok.Setter;
 
 import javax.persistence.*;
 
+import lombok.*;
+
+import javax.persistence.*;
+
 @Entity
 @Table(name = "user_reportees")
-@Getter
-@Setter
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class UserReportee {
-
     @Id
     @Column(name = "relation_uuid")
     private String relationUuid;
@@ -26,5 +31,4 @@ public class UserReportee {
 
     @Column(name = "job_profile_uuid", nullable = false)
     private String jobProfileUuid;
-
 }
