@@ -11,7 +11,7 @@ import javax.validation.Valid;
 import static com.userapi.common.constants.HeaderConstants.*;
 
 @RestController
-@RequestMapping("/users") // Base path for multiple users operations (plural)
+@RequestMapping("/users") // Base path for multiple users operations
 @RequiredArgsConstructor
 public class UserListController {
 
