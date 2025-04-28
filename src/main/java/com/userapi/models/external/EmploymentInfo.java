@@ -8,8 +8,15 @@ import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 
-@Getter
-@Setter
+import com.fasterxml.jackson.databind.JsonNode;
+import lombok.Data;
+
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
+import java.time.LocalDateTime;
+import java.util.Map;
+
+@Data
 public class EmploymentInfo {
     @NotNull(message = "Start date is required")
     private LocalDateTime startDate;
@@ -24,6 +31,6 @@ public class EmploymentInfo {
 
     private String reportingManager;
 
-    private JsonNode extensionsData;
-
+    @NotNull(message = "Extensions data is required")
+    private Map<String, Object> extensionsData;
 }
