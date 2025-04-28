@@ -11,43 +11,34 @@ import com.userapi.models.external.*;
 import com.userapi.repository.JobProfileRepository;
 import com.userapi.repository.UserProfileRepository;
 import com.userapi.repository.UserReporteeRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class UserService {
-
     private final UserProfileRepository userProfileRepository;
     private final JobProfileRepository jobProfileRepository;
     private final UserReporteeRepository userReporteeRepository;
     private final ObjectMapper objectMapper;
 
-    @Autowired
-    public UserService(UserProfileRepository userProfileRepository,
-                       JobProfileRepository jobProfileRepository,
-                       UserReporteeRepository userReporteeRepository,
-                       ObjectMapper objectMapper) {
-        this.userProfileRepository = userProfileRepository;
-        this.jobProfileRepository = jobProfileRepository;
-        this.userReporteeRepository = userReporteeRepository;
-        this.objectMapper = objectMapper;
-    }
-
     @Transactional
     public CreateUserResponse createUser(CreateUserRequest request, String orgUuid) {
-        // Check for duplicates
-        List<UserProfile> conflictingUsers = userProfileRepository.findConflictingUsers(
+        // Check for duplicate username, email, or phone (single DB call)
+        List<UserProfile> conflicts = userProfileRepository.findConflictingUsers(
                 request.getUsername(),
                 request.getEmailInfo().getEmail(),
                 request.getPhoneInfo().getNumber()
         );
 
-        for (UserProfile user : conflictingUsers) {
+        for (UserProfile user : conflicts) {
             if (user.getUsername().equals(request.getUsername())) {
                 throw new DuplicateResourceException("Username already exists");
             }
@@ -62,81 +53,59 @@ public class UserService {
         // Create JobProfiles
         List<String> jobProfileUuids = new ArrayList<>();
 
-        for (EmploymentInfo employmentInfo : request.getEmploymentInfo()) {
-            JobProfile jobProfile = new JobProfile();
-            String jobProfileUuid = UUID.randomUUID().toString();
-            jobProfile.setJobProfileUuid(jobProfileUuid);
-            jobProfile.setOrganizationUuid(orgUuid);
-            jobProfile.setTitle(employmentInfo.getJobTitle());
-            jobProfile.setStartDate(employmentInfo.getStartDate());
-            jobProfile.setEndDate(employmentInfo.getEndDate());
-            jobProfile.setReportingManager(employmentInfo.getReportingManager());
-            jobProfile.setOrganizationUnit(employmentInfo.getOrganizationUnit());
-
-            try {
-                jobProfile.setExtensionsData(objectMapper.writeValueAsString(employmentInfo.getExtensionsData()));
-            } catch (Exception e) {
-                // Handle exception appropriately
-                jobProfile.setExtensionsData("{}");
-            }
-
-            jobProfileRepository.save(jobProfile);
-            jobProfileUuids.add(jobProfileUuid);
-        }
-
-        // Create UserProfile
-        UserProfile userProfile = new UserProfile();
-        String userUuid = UUID.randomUUID().toString();
-        userProfile.setUserUuid(userUuid);
-        userProfile.setOrganizationUuid(orgUuid);
-        userProfile.setUsername(request.getUsername());
-        userProfile.setFirstName(request.getFirstName());
-        userProfile.setMiddleName(request.getMiddleName());
-        userProfile.setLastName(request.getLastName());
-
         // Use the start date of the earliest job profile
-        LocalDateTime earliestStartDate = request.getEmploymentInfo().stream()
+        LocalDateTime earliestStartDate = request.getEmploymentInfoList().stream()
                 .map(EmploymentInfo::getStartDate)
                 .min(LocalDateTime::compareTo)
                 .orElse(LocalDateTime.now());
 
-        userProfile.setStartDate(earliestStartDate);
-        userProfile.setEmail(request.getEmailInfo().getEmail());
-        userProfile.setEmailVerificationStatus(request.getEmailInfo().getVerificationStatus());
-        userProfile.setPhone(request.getPhoneInfo().getNumber());
-        userProfile.setPhoneCountryCode(request.getPhoneInfo().getCountryCode());
-        userProfile.setPhoneVerificationStatus(request.getPhoneInfo().getVerificationStatus());
-        userProfile.setStatus("Active");
+        for (EmploymentInfo emp : request.getEmploymentInfoList()) {
+            JobProfile jobProfile = JobProfile.builder()
+                    .jobProfileUuid(UUID.randomUUID().toString())
+                    .organizationUuid(orgUuid)
+                    .title(emp.getJobTitle())
+                    .startDate(emp.getStartDate())
+                    .endDate(emp.getEndDate())
+                    .reportingManager(emp.getReportingManager())
+                    .organizationUnit(emp.getOrganizationUnit())
+                    .extensionsData(writeJson(emp.getExtensionsData()))
+                    .build();
+            jobProfileRepository.save(jobProfile);
+            jobProfileUuids.add(jobProfile.getJobProfileUuid());
+        }
 
-        // Set job profile uuids
-        userProfile.setJobProfileUuids(jobProfileUuids.toArray(new String[0]));
-
+        UserProfile userProfile = UserProfile.builder()
+                .userUuid(UUID.randomUUID().toString())
+                .organizationUuid(orgUuid)
+                .username(request.getUsername())
+                .firstName(request.getFirstName())
+                .middleName(request.getMiddleName())
+                .lastName(request.getLastName())
+                .startDate(earliestStartDate)
+                .endDate(null)
+                .jobProfileUuids(jobProfileUuids.toArray(new String[0]))
+                .email(request.getEmailInfo().getEmail())
+                .emailVerificationStatus(request.getEmailInfo().getVerificationStatus())
+                .phone(request.getPhoneInfo().getNumber())
+                .phoneCountryCode(request.getPhoneInfo().getCountryCode())
+                .phoneVerificationStatus(request.getPhoneInfo().getVerificationStatus())
+                .status("Active")
+                .build();
         userProfileRepository.save(userProfile);
 
-        // Create response
-        CreateUserResponse response = new CreateUserResponse();
-        response.setUserId(userUuid);
-        response.setUsername(request.getUsername());
-        response.setStatus("Active");
-        response.setMessage("User created successfully");
-
-        return response;
+        return new CreateUserResponse(
+                userProfile.getUserUuid(),
+                userProfile.getUsername(),
+                userProfile.getStatus(),
+                "User created successfully"
+        );
     }
-
 
     @Transactional(readOnly = true)
-    public GetUserResponse getUserById(String userId) {
-        // Find the user by ID
+    public GetUserResponse getUser(String userId) {
         UserProfile user = userProfileRepository.findById(userId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        // Build and return the response
-        return buildUserResponse(user);
-    }
-
-    private GetUserResponse buildUserResponse(UserProfile user) {
-        // Build the basic response
         GetUserResponse response = new GetUserResponse();
         response.setUserId(user.getUserUuid());
         response.setUsername(user.getUsername());
@@ -149,66 +118,56 @@ public class UserService {
         response.setEndDate(user.getEndDate());
         response.setStatus(user.getStatus());
 
-        // Fetch and sort all of this user's job profiles
-        List<JobProfile> allJobProfiles = Arrays.stream(user.getJobProfileUuids())
-                .map(jobProfileRepository::findById)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .sorted(Comparator.comparing(JobProfile::getStartDate).reversed())
-                .collect(Collectors.toList());
+        // Fetch all job profiles
+        List<JobProfile> jobProfiles = new ArrayList<>();
+        for (String jpUuid : user.getJobProfileUuids()) {
+            jobProfileRepository.findById(jpUuid).ifPresent(jobProfiles::add);
+        }
 
-        // Determine current vs previous job profiles
-        JobProfile current = allJobProfiles.stream()
+        // Sort by startDate descending
+        jobProfiles.sort(Comparator.comparing(JobProfile::getStartDate).reversed());
+
+        // Current: endDate == null or latest startDate
+        JobProfileDTO currentJobProfile = null;
+        List<JobProfileDTO> previousJobProfiles = new ArrayList<>();
+
+        // Find current job profile (no end date)
+        JobProfile current = jobProfiles.stream()
                 .filter(jp -> jp.getEndDate() == null)
                 .findFirst()
-                .orElse(allJobProfiles.isEmpty() ? null : allJobProfiles.get(0));
+                .orElse(jobProfiles.isEmpty() ? null : jobProfiles.get(0));
 
         if (current != null) {
-            JobProfileInfo currentProfileDTO = convertToJobProfileDTO(current);
+            currentJobProfile = convertToJobProfileDTO(current);
 
-            // Find reportees for the current job profile
+            // Find reportees for current job
             List<UserReportee> reporteeRelations = userReporteeRepository.findByManagerUserUuid(user.getUserUuid());
             List<String> reporteeIds = reporteeRelations.stream()
                     .map(UserReportee::getUserUuid)
                     .collect(Collectors.toList());
 
-            currentProfileDTO.setReportees(reporteeIds);
-            response.setCurrentJobProfile(currentProfileDTO);
+            currentJobProfile.setReportees(reporteeIds);
         }
 
-        List<JobProfileInfo> previous = allJobProfiles.stream()
-                .filter(jp -> current == null
-                        ? jp.getEndDate() != null
-                        : !jp.getJobProfileUuid().equals(current.getJobProfileUuid()) && jp.getEndDate() != null)
-                .map(this::convertToJobProfileDTO)
-                .collect(Collectors.toList());
+        // Find previous job profiles
+        for (JobProfile jp : jobProfiles) {
+            if (current == null || !jp.getJobProfileUuid().equals(current.getJobProfileUuid())) {
+                JobProfileDTO dto = convertToJobProfileDTO(jp);
 
-        // For each previous job profile, find the reportees
-        for (JobProfileInfo prevProfile : previous) {
-            String jobProfileId = null;
-            // Find the job profile ID by matching the profile details
-            for (JobProfile jp : allJobProfiles) {
-                if (jp.getTitle().equals(prevProfile.getJobTitle()) &&
-                        jp.getStartDate().equals(prevProfile.getStartDate()) &&
-                        (jp.getEndDate() == null ? prevProfile.getEndDate() == null : jp.getEndDate().equals(prevProfile.getEndDate()))) {
-                    jobProfileId = jp.getJobProfileUuid();
-                    break;
-                }
-            }
-
-            if (jobProfileId != null) {
-                List<UserReportee> reporteeRelations = userReporteeRepository.findByJobProfileUuid(jobProfileId);
+                // Find reportees for this past job profile
+                List<UserReportee> reporteeRelations = userReporteeRepository.findByJobProfileUuid(jp.getJobProfileUuid());
                 List<String> reporteeIds = reporteeRelations.stream()
                         .map(UserReportee::getUserUuid)
                         .collect(Collectors.toList());
 
-                prevProfile.setReportees(reporteeIds);
-            } else {
-                prevProfile.setReportees(Collections.emptyList());
+                dto.setReportees(reporteeIds);
+                previousJobProfiles.add(dto);
             }
         }
 
-        response.setPreviousJobProfiles(previous);
+        response.setCurrentJobProfile(currentJobProfile);
+        response.setPreviousJobProfiles(previousJobProfiles);
+
         return response;
     }
 
@@ -216,26 +175,83 @@ public class UserService {
         return "+" + user.getPhoneCountryCode() + user.getPhone();
     }
 
-    private JobProfileInfo convertToJobProfileDTO(JobProfile jobProfile) {
-        JobProfileInfo dto = new JobProfileInfo();
+    private JobProfileDTO convertToJobProfileDTO(JobProfile jobProfile) {
+        JobProfileDTO dto = new JobProfileDTO();
         dto.setJobTitle(jobProfile.getTitle());
         dto.setStartDate(jobProfile.getStartDate());
         dto.setEndDate(jobProfile.getEndDate());
         dto.setReportingManager(jobProfile.getReportingManager());
         dto.setOrganizationUnit(jobProfile.getOrganizationUnit());
-
-        dto.setReportees(Collections.emptyList());
-
-        // Parse extensions data
-        try {
-            JsonNode extensionsData = objectMapper.readTree(jobProfile.getExtensionsData());
-            dto.setExtensionsData(extensionsData);
-        } catch (Exception e) {
-            // If parsing fails, set empty object
-            dto.setExtensionsData(objectMapper.createObjectNode());
-        }
-
+        dto.setExtensionsData(readJson(jobProfile.getExtensionsData()));
         return dto;
     }
-    
+
+    private static final Map<String, Function<UserProfile, Object>> fieldExtractors = Map.of(
+            "userId", UserProfile::getUserUuid,
+            "username", UserProfile::getUsername,
+            "status", UserProfile::getStatus,
+            "firstName", UserProfile::getFirstName,
+            "lastName", UserProfile::getLastName,
+            "email", UserProfile::getEmail,
+            "phone", UserProfile::getPhone
+    );
+
+    @Transactional(readOnly = true)
+    public ListUsersResponse listUsers(ListUsersRequest request, String orgUuid) {
+        final List<String> baseAttributes = (request.getSelector() != null && request.getSelector().getBase_attributes() != null)
+                ? request.getSelector().getBase_attributes()
+                : null;
+
+        Map<String, List<String>> filterMap = new HashMap<>();
+        if (request.getFilterCriteria() != null && request.getFilterCriteria().getAttributes() != null) {
+            for (ListUsersFilterCriteriaAttribute attr : request.getFilterCriteria().getAttributes()) {
+                filterMap.put(attr.getName(), attr.getValues());
+            }
+        }
+
+        List<UserProfile> users = userProfileRepository.findUsersWithFilters(
+                orgUuid,
+                filterMap.get("email"),
+                filterMap.get("username"),
+                filterMap.get("status"),
+                filterMap.get("firstName"),
+                filterMap.get("lastName"),
+                filterMap.get("phone")
+        );
+
+        List<Map<String, Object>> userMaps = users.stream().map(user -> {
+            Map<String, Object> map = new HashMap<>();
+            if (baseAttributes == null || baseAttributes.isEmpty()) {
+                fieldExtractors.forEach((field, extractor) -> map.put(field, extractor.apply(user)));
+            } else {
+                for (String attr : baseAttributes) {
+                    Function<UserProfile, Object> extractor = fieldExtractors.get(attr);
+                    if (extractor != null) {
+                        map.put(attr, extractor.apply(user));
+                    }
+                }
+            }
+            return map;
+        }).collect(Collectors.toList());
+
+        ListUsersResponse response = new ListUsersResponse();
+        response.setUsers(userMaps);
+        return response;
+    }
+
+    private String writeJson(Map<String, Object> map) {
+        try {
+            return objectMapper.writeValueAsString(map);
+        } catch (Exception e) {
+            return "{}";
+        }
+    }
+
+    private Map<String, Object> readJson(String json) {
+        try {
+            return objectMapper.readValue(json, Map.class);
+        } catch (Exception e) {
+            return new HashMap<>();
+        }
+    }
 }
