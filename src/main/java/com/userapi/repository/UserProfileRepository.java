@@ -16,4 +16,21 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, String
     List<UserProfile> findConflictingUsers(@Param("username") String username,
                                            @Param("email") String email,
                                            @Param("phone") String phone);
+    @Query("SELECT u FROM UserProfile u WHERE u.organizationUuid = :orgUuid " +
+            "AND (:email IS NULL OR u.email IN :email) " +
+            "AND (:username IS NULL OR u.username IN :username) " +
+            "AND (:status IS NULL OR u.status IN :status) " +
+            "AND (:firstName IS NULL OR u.firstName IN :firstName) " +
+            "AND (:lastName IS NULL OR u.lastName IN :lastName) " +
+            "AND (:phone IS NULL OR u.phone IN :phone)")
+    List<UserProfile> findUsersWithFilters(
+            @Param("orgUuid") String orgUuid,
+            @Param("email") List<String> email,
+            @Param("username") List<String> username,
+            @Param("status") List<String> status,
+            @Param("firstName") List<String> firstName,
+            @Param("lastName") List<String> lastName,
+            @Param("phone") List<String> phone);
 }
+
+
