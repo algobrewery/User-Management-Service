@@ -6,8 +6,11 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Getter
-@Setter
+import lombok.Data;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
 public class GetUserResponse {
     private String userId;
     private String username;
@@ -19,6 +22,6 @@ public class GetUserResponse {
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private String status;
-    private JobProfileInfo currentJobProfile;
-    private List<JobProfileInfo> previousJobProfiles;
+    private JobProfileDTO currentJobProfile;
+    private List<JobProfileDTO> previousJobProfiles;
 }
