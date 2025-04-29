@@ -41,7 +41,7 @@ public class UserController {
     public ResponseEntity<GetUserResponse> getUserById(
             @PathVariable String userId) {
 
-        GetUserResponse response = userService.getUserById(userId);
+        GetUserResponse response = userService.getUser(userId);
         return ResponseEntity.ok(response);
     }
 }
