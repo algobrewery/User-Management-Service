@@ -39,9 +39,14 @@ public class UserController {
 
     @GetMapping("/{userId}")
     public ResponseEntity<GetUserResponse> getUserById(
+            @RequestHeader(APP_ORG_UUID) String orgUUID,
+            @RequestHeader(APP_USER_UUID) String userUUID,
+            @RequestHeader(APP_CLIENT_USER_SESSION_UUID) String clientUserSessionUUID,
+            @RequestHeader(APP_TRACE_ID) String traceID,
+            @RequestHeader(APP_REGION_ID) String regionID,
             @PathVariable String userId) {
 
-        GetUserResponse response = userService.getUser(userId);
+        GetUserResponse response = userService.getUser(orgUUID, userId);
         return ResponseEntity.ok(response);
     }
 }

@@ -11,11 +11,16 @@ import java.util.List;
 @Repository
 public interface UserProfileRepository extends JpaRepository<UserProfile, String> {
 
-
-    @Query("SELECT u FROM UserProfile u WHERE u.username = :username OR u.email = :email OR u.phone = :phone")
-    List<UserProfile> findConflictingUsers(@Param("username") String username,
+    @Query("SELECT u FROM UserProfile u WHERE u.organizationUuid = :orgUuid AND (u.username = :username OR u.email = :email OR u.phone = :phone)")
+    List<UserProfile> findUsersMatchingAny(@Param("orgUuid") String orgUuid,
+                                           @Param("username") String username,
                                            @Param("email") String email,
                                            @Param("phone") String phone);
+
+    @Query("SELECT u FROM UserProfile u WHERE u.organizationUuid = :orgUuid AND u.user_uuid = :userUuid")
+    UserProfile findByUserId(@Param("orgUuid") String orgUuid,
+                             @Param("userUuid") String userUuid);
+
     @Query("SELECT u FROM UserProfile u WHERE u.organizationUuid = :orgUuid " +
             "AND (:email IS NULL OR u.email IN :email) " +
             "AND (:username IS NULL OR u.username IN :username) " +

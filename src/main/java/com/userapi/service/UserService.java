@@ -1,18 +1,16 @@
 package com.userapi.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.userapi.exception.DuplicateResourceException;
+import com.userapi.exception.ResourceNotFoundException;
 import com.userapi.models.entity.JobProfile;
 import com.userapi.models.entity.UserProfile;
 import com.userapi.models.entity.UserReportee;
-import com.userapi.exception.DuplicateResourceException;
-import com.userapi.exception.ResourceNotFoundException;
 import com.userapi.models.external.*;
 import com.userapi.repository.JobProfileRepository;
 import com.userapi.repository.UserProfileRepository;
 import com.userapi.repository.UserReporteeRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +30,8 @@ public class UserService {
     @Transactional
     public CreateUserResponse createUser(CreateUserRequest request, String orgUuid) {
         // Check for duplicate username, email, or phone (single DB call)
-        List<UserProfile> conflicts = userProfileRepository.findConflictingUsers(
+        List<UserProfile> conflicts = userProfileRepository.findUsersMatchingAny(
+                orgUuid,
                 request.getUsername(),
                 request.getEmailInfo().getEmail(),
                 request.getPhoneInfo().getNumber()
@@ -102,8 +101,8 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public GetUserResponse getUser(String userId) {
-        UserProfile user = userProfileRepository.findById(userId)
+    public GetUserResponse getUser(String orgUUID, String userId) {
+        UserProfile user = Optional.ofNullable(userProfileRepository.findByUserId(orgUUID, userId))
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
         GetUserResponse response = new GetUserResponse();
