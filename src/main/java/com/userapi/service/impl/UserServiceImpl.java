@@ -8,6 +8,9 @@ import com.userapi.models.entity.UserProfile;
 import com.userapi.models.entity.UserReportee;
 import com.userapi.models.entity.UserStatus;
 import com.userapi.models.external.*;
+import com.userapi.models.internal.CreateUserInternalRequest;
+import com.userapi.models.internal.CreateUserInternalResponse;
+import com.userapi.models.internal.EmploymentInfoDto;
 import com.userapi.repository.JobProfileRepository;
 import com.userapi.repository.UserProfileRepository;
 import com.userapi.repository.UserReporteeRepository;
@@ -31,10 +34,10 @@ public class UserServiceImpl implements UserService {
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public CreateUserResponse createUser(CreateUserRequest request, String orgUuid) {
+    public CreateUserInternalResponse createUser(CreateUserInternalRequest request) {
         // Check for duplicate username, email, or phone (single DB call)
         List<UserProfile> conflicts = userProfileRepository.findUsersMatchingAny(
-                orgUuid,
+                request.getRequestContext().getAppOrgUuid(),
                 request.getUsername(),
                 request.getEmailInfo().getEmail(),
                 request.getPhoneInfo().getNumber()
@@ -57,14 +60,14 @@ public class UserServiceImpl implements UserService {
 
         // Use the start date of the earliest job profile
         LocalDateTime earliestStartDate = request.getEmploymentInfoList().stream()
-                .map(EmploymentInfo::getStartDate)
+                .map(EmploymentInfoDto::getStartDate)
                 .min(LocalDateTime::compareTo)
                 .orElse(LocalDateTime.now());
 
-        for (EmploymentInfo emp : request.getEmploymentInfoList()) {
+        for (EmploymentInfoDto emp : request.getEmploymentInfoList()) {
             JobProfile jobProfile = JobProfile.builder()
                     .jobProfileUuid(UUID.randomUUID().toString())
-                    .organizationUuid(orgUuid)
+                    .organizationUuid(request.getRequestContext().getAppOrgUuid())
                     .title(emp.getJobTitle())
                     .startDate(emp.getStartDate())
                     .endDate(emp.getEndDate())
@@ -78,7 +81,7 @@ public class UserServiceImpl implements UserService {
 
         UserProfile userProfile = UserProfile.builder()
                 .userUuid(UUID.randomUUID().toString())
-                .organizationUuid(orgUuid)
+                .organizationUuid(request.getRequestContext().getAppOrgUuid())
                 .username(request.getUsername())
                 .firstName(request.getFirstName())
                 .middleName(request.getMiddleName())
@@ -95,7 +98,7 @@ public class UserServiceImpl implements UserService {
                 .build();
         userProfileRepository.save(userProfile);
 
-        return CreateUserResponse.builder()
+        return CreateUserInternalResponse.builder()
                 .userId(userProfile.getUserUuid())
                 .username(userProfile.getUsername())
                 .status(userProfile.getStatus())

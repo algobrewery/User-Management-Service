@@ -1,10 +1,15 @@
 package com.userapi.controller;
 
+import com.userapi.converters.CreateUserRequestConverter;
+import com.userapi.converters.CreateUserResponseConverter;
 import com.userapi.models.external.CreateUserRequest;
 import com.userapi.models.external.CreateUserResponse;
 import com.userapi.models.external.GetUserResponse;
+import com.userapi.models.internal.CreateUserInternalRequest;
+import com.userapi.models.internal.CreateUserInternalResponse;
 import com.userapi.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,10 +22,17 @@ import static com.userapi.common.constants.HeaderConstants.*;
 @RequestMapping("/user")
 public class UserController {
 
+    private final CreateUserRequestConverter createUserRequestConverter;
+    private final CreateUserResponseConverter createUserResponseConverter;
     private final UserService userService;
 
     @Autowired
-    public UserController(UserService userService) {
+    public UserController(
+            @Qualifier("CreateUserRequestConverter") CreateUserRequestConverter createUserRequestConverter,
+            @Qualifier("CreateUserResponseConverter") CreateUserResponseConverter createUserResponseConverter,
+            UserService userService) {
+        this.createUserRequestConverter = createUserRequestConverter;
+        this.createUserResponseConverter = createUserResponseConverter;
         this.userService = userService;
     }
 
@@ -33,8 +45,16 @@ public class UserController {
             @RequestHeader(APP_REGION_ID) String regionID,
             @Valid @RequestBody CreateUserRequest request) {
 
-        CreateUserResponse response = userService.createUser(request, orgUUID);
-        return new ResponseEntity<>(response, HttpStatus.CREATED);
+        CreateUserInternalRequest internalRequest = createUserRequestConverter.toInternal(
+                orgUUID,
+                userUUID,
+                clientUserSessionUUID,
+                traceID,
+                regionID,
+                request);
+        CreateUserInternalResponse internalResponse = userService.createUser(internalRequest);
+        CreateUserResponse externalResponse = createUserResponseConverter.toExternal(internalResponse);
+        return new ResponseEntity<>(externalResponse, HttpStatus.CREATED);
     }
 
     @GetMapping("/{userId}")

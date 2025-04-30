@@ -4,10 +4,11 @@ import com.userapi.models.external.ListUsersRequest;
 import com.userapi.models.external.ListUsersResponse;
 import com.userapi.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.*;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
+
 import static com.userapi.common.constants.HeaderConstants.*;
 
 @RestController

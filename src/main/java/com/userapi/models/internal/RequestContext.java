@@ -1,17 +1,28 @@
 package com.userapi.models.internal;
 
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NonNull;
+import lombok.Setter;
 
-import java.util.Collections;
-import java.util.Map;
-
+@Builder
 @Getter
+@Setter
 public class RequestContext {
-    @NonNull
-    private final Map<String, String> headers;
 
-    public RequestContext(@NonNull final Map<String, String> headers) {
-        this.headers = Collections.unmodifiableMap(headers);
-    }
+    @NonNull
+    private String appUserUuid;
+
+    @NonNull
+    private String appOrgUuid;
+
+    @NonNull
+    private String appClientUserSessionUuid;
+
+    @NonNull
+    private String traceId;
+
+    @NonNull
+    private String regionId;
+
 }

@@ -1,9 +1,9 @@
 package com.userapi.models.external;
 
+import lombok.Data;
+
 import java.time.LocalDateTime;
 import java.util.List;
-
-import lombok.Data;
 
 @Data
 public class GetUserResponse {

@@ -1,10 +1,14 @@
 package com.userapi.service;
 
-import com.userapi.models.external.*;
+import com.userapi.models.external.GetUserResponse;
+import com.userapi.models.external.ListUsersRequest;
+import com.userapi.models.external.ListUsersResponse;
+import com.userapi.models.internal.CreateUserInternalRequest;
+import com.userapi.models.internal.CreateUserInternalResponse;
 
 public interface UserService {
 
-    CreateUserResponse createUser(CreateUserRequest request, String orgUuid);
+    CreateUserInternalResponse createUser(CreateUserInternalRequest request);
 
     GetUserResponse getUser(String orgUUID, String userId);
 

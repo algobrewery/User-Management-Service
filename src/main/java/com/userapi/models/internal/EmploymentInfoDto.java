@@ -1,12 +1,12 @@
 package com.userapi.models.internal;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Builder
 @Getter
@@ -28,6 +28,6 @@ public class EmploymentInfoDto {
     private String reportingManager;
 
     @NonNull
-    private JsonNode extensionsData;
+    private Map<String, Object> extensionsData;
 
 }

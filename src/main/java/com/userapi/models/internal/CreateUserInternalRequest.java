@@ -1,16 +1,16 @@
 package com.userapi.models.internal;
 
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 
 import java.util.List;
 
-@Builder
+@SuperBuilder
 @Getter
 @Setter
-public class CreateUserInternalRequest extends BaseRequest {
+public class CreateUserInternalRequest extends BaseInternalRequest {
 
     @NonNull
     private String username;
@@ -30,6 +30,6 @@ public class CreateUserInternalRequest extends BaseRequest {
     private EmailInfoDto emailInfo;
 
     @NonNull
-    private List<EmploymentInfoDto> employmentInfo;
+    private List<EmploymentInfoDto> employmentInfoList;
 
 }

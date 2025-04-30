@@ -1,6 +1,7 @@
 package com.userapi.models.external;
 
 import lombok.Data;
+
 import java.util.List;
 import java.util.Map;
 
