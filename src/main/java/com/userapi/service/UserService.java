@@ -6,6 +6,7 @@ import com.userapi.exception.ResourceNotFoundException;
 import com.userapi.models.entity.JobProfile;
 import com.userapi.models.entity.UserProfile;
 import com.userapi.models.entity.UserReportee;
+import com.userapi.models.entity.UserStatus;
 import com.userapi.models.external.*;
 import com.userapi.repository.JobProfileRepository;
 import com.userapi.repository.UserProfileRepository;
@@ -88,16 +89,16 @@ public class UserService {
                 .phone(request.getPhoneInfo().getNumber())
                 .phoneCountryCode(request.getPhoneInfo().getCountryCode())
                 .phoneVerificationStatus(request.getPhoneInfo().getVerificationStatus())
-                .status("Active")
+                .status(UserStatus.ACTIVE.getName())
                 .build();
         userProfileRepository.save(userProfile);
 
-        return new CreateUserResponse(
-                userProfile.getUserUuid(),
-                userProfile.getUsername(),
-                userProfile.getStatus(),
-                "User created successfully"
-        );
+        return CreateUserResponse.builder()
+                .userId(userProfile.getUserUuid())
+                .username(userProfile.getUsername())
+                .status(userProfile.getStatus())
+                .message("User created successfully")
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -127,8 +128,8 @@ public class UserService {
         jobProfiles.sort(Comparator.comparing(JobProfile::getStartDate).reversed());
 
         // Current: endDate == null or latest startDate
-        JobProfileDTO currentJobProfile = null;
-        List<JobProfileDTO> previousJobProfiles = new ArrayList<>();
+        JobProfileInfo currentJobProfile = null;
+        List<JobProfileInfo> previousJobProfiles = new ArrayList<>();
 
         // Find current job profile (no end date)
         JobProfile current = jobProfiles.stream()
@@ -151,7 +152,7 @@ public class UserService {
         // Find previous job profiles
         for (JobProfile jp : jobProfiles) {
             if (current == null || !jp.getJobProfileUuid().equals(current.getJobProfileUuid())) {
-                JobProfileDTO dto = convertToJobProfileDTO(jp);
+                JobProfileInfo dto = convertToJobProfileDTO(jp);
 
                 // Find reportees for this past job profile
                 List<UserReportee> reporteeRelations = userReporteeRepository.findByJobProfileUuid(jp.getJobProfileUuid());
@@ -174,8 +175,8 @@ public class UserService {
         return "+" + user.getPhoneCountryCode() + user.getPhone();
     }
 
-    private JobProfileDTO convertToJobProfileDTO(JobProfile jobProfile) {
-        JobProfileDTO dto = new JobProfileDTO();
+    private JobProfileInfo convertToJobProfileDTO(JobProfile jobProfile) {
+        JobProfileInfo dto = new JobProfileInfo();
         dto.setJobTitle(jobProfile.getTitle());
         dto.setStartDate(jobProfile.getStartDate());
         dto.setEndDate(jobProfile.getEndDate());

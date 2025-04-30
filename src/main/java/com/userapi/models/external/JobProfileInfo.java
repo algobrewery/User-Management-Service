@@ -6,7 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 @Data
-public class JobProfileDTO {
+public class JobProfileInfo {
+
     private String jobTitle;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
@@ -14,4 +15,5 @@ public class JobProfileDTO {
     private List<String> reportees;
     private String organizationUnit;
     private Map<String, Object> extensionsData;
+
 }

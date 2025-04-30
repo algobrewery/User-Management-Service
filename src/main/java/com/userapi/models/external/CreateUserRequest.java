@@ -1,14 +1,5 @@
 package com.userapi.models.external;
 
-import lombok.Getter;
-import lombok.Setter;
-
-import javax.validation.Valid;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotEmpty;
-import javax.validation.constraints.NotNull;
-import java.util.List;
-
 import lombok.Data;
 
 import javax.validation.Valid;
@@ -19,6 +10,7 @@ import java.util.List;
 
 @Data
 public class CreateUserRequest {
+
     @NotBlank(message = "Username is required")
     private String username;
 
