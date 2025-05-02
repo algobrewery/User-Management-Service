@@ -11,14 +11,20 @@ import com.userapi.models.external.*;
 import com.userapi.models.internal.CreateUserInternalRequest;
 import com.userapi.models.internal.CreateUserInternalResponse;
 import com.userapi.models.internal.EmploymentInfoDto;
+import com.userapi.models.internal.ResponseResult;
 import com.userapi.repository.JobProfileRepository;
 import com.userapi.repository.UserProfileRepository;
+import com.userapi.repository.UserProfileRepositoryCustom;
 import com.userapi.repository.UserReporteeRepository;
 import com.userapi.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.userapi.models.internal.ResponseReasonCode;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
@@ -103,6 +109,8 @@ public class UserServiceImpl implements UserService {
                 .username(userProfile.getUsername())
                 .status(userProfile.getStatus())
                 .message("User created successfully")
+                .responseResult(ResponseResult.SUCCESS)
+                .responseReasonCode(ResponseReasonCode.CREATED_SUCCESSFULLY)
                 .build();
     }
 
@@ -191,57 +199,69 @@ public class UserServiceImpl implements UserService {
         return dto;
     }
 
-    private static final Map<String, Function<UserProfile, Object>> fieldExtractors = Map.of(
-            "userId", UserProfile::getUserUuid,
-            "username", UserProfile::getUsername,
-            "status", UserProfile::getStatus,
-            "firstName", UserProfile::getFirstName,
-            "lastName", UserProfile::getLastName,
-            "email", UserProfile::getEmail,
-            "phone", UserProfile::getPhone
+    private static final Map<String, Function<UserProfile, Object>> userProfileFieldExtractors = Map.ofEntries(
+            Map.entry("userId", UserProfile::getUserUuid),
+            Map.entry("username", UserProfile::getUsername),
+            Map.entry("status", UserProfile::getStatus),
+            Map.entry("firstName", UserProfile::getFirstName),
+            Map.entry("middleName", UserProfile::getMiddleName),
+            Map.entry("lastName", UserProfile::getLastName),
+            Map.entry("email", UserProfile::getEmail),
+            Map.entry("phone", UserProfile::getPhone),
+            Map.entry("startDate", UserProfile::getStartDate),
+            Map.entry("endDate", UserProfile::getEndDate)
     );
 
     @Transactional(readOnly = true)
     public ListUsersResponse listUsers(ListUsersRequest request, String orgUuid) {
-        final List<String> baseAttributes = (request.getSelector() != null && request.getSelector().getBase_attributes() != null)
-                ? request.getSelector().getBase_attributes()
-                : null;
+        // Create pageable object
+        Pageable pageable = PageRequest.of(
+                request.getPage(),
+                request.getSize(),
+                Sort.by(Sort.Direction.fromString(request.getSortDirection()), request.getSortBy())
+        );
 
-        Map<String, List<String>> filterMap = new HashMap<>();
+        // Convert filter criteria to map
+        Map<String, List<String>> filters = new HashMap<>();
         if (request.getFilterCriteria() != null && request.getFilterCriteria().getAttributes() != null) {
             for (ListUsersFilterCriteriaAttribute attr : request.getFilterCriteria().getAttributes()) {
-                filterMap.put(attr.getName(), attr.getValues());
+                filters.put(attr.getName(), attr.getValues());
             }
         }
 
-        List<UserProfile> users = userProfileRepository.findUsersWithFilters(
-                orgUuid,
-                filterMap.get("email"),
-                filterMap.get("username"),
-                filterMap.get("status"),
-                filterMap.get("firstName"),
-                filterMap.get("lastName"),
-                filterMap.get("phone")
-        );
+        // Get paginated results
+        Page<UserProfile> userPage = userProfileRepository.findUsersWithFilters(orgUuid, filters, pageable);
 
-        List<Map<String, Object>> userMaps = users.stream().map(user -> {
-            Map<String, Object> map = new HashMap<>();
-            if (baseAttributes == null || baseAttributes.isEmpty()) {
-                fieldExtractors.forEach((field, extractor) -> map.put(field, extractor.apply(user)));
-            } else {
-                for (String attr : baseAttributes) {
-                    Function<UserProfile, Object> extractor = fieldExtractors.get(attr);
-                    if (extractor != null) {
-                        map.put(attr, extractor.apply(user));
-                    }
+        // Convert to response
+        ListUsersResponse response = new ListUsersResponse();
+        response.setUsers(userPage.getContent().stream()
+                .map(user -> convertUserToMap(user, request.getSelector()))
+                .collect(Collectors.toList()));
+
+        // Set pagination metadata
+        response.setTotalElements(userPage.getTotalElements());
+        response.setTotalPages(userPage.getTotalPages());
+        response.setCurrentPage(userPage.getNumber());
+        response.setPageSize(userPage.getSize());
+        response.setHasNext(userPage.hasNext());
+        response.setHasPrevious(userPage.hasPrevious());
+
+        return response;
+    }
+
+    private Map<String, Object> convertUserToMap(UserProfile user, ListUsersSelector selector) {
+        Map<String, Object> map = new HashMap<>();
+        if (selector == null || selector.getBase_attributes() == null) {
+            userProfileFieldExtractors.forEach((field, extractor) -> map.put(field, extractor.apply(user)));
+        } else {
+            for (String attr : selector.getBase_attributes()) {
+                Function<UserProfile, Object> extractor = userProfileFieldExtractors.get(attr);
+                if (extractor != null) {
+                    map.put(attr, extractor.apply(user));
                 }
             }
-            return map;
-        }).collect(Collectors.toList());
-
-        ListUsersResponse response = new ListUsersResponse();
-        response.setUsers(userMaps);
-        return response;
+        }
+        return map;
     }
 
     private String writeJson(Map<String, Object> map) {
