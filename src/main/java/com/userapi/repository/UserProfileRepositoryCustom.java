@@ -1,18 +1,16 @@
 package com.userapi.repository;
 
-
 import com.userapi.models.entity.UserProfile;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Map;
 
 public interface UserProfileRepositoryCustom {
-    List<UserProfile> findUsersWithFilters(
+    Page<UserProfile> findUsersWithFilters(
             String orgUuid,
-            List<String> emails,
-            List<String> usernames,
-            List<String> statuses,
-            List<String> firstNames,
-            List<String> lastNames,
-            List<String> phones
+            Map<String, List<String>> filters,
+            Pageable pageable
     );
 }
