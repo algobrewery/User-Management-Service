@@ -7,10 +7,7 @@ import com.userapi.models.internal.CreateUserInternalRequest;
 import com.userapi.models.internal.CreateUserInternalResponse;
 
 public interface UserService {
-
     CreateUserInternalResponse createUser(CreateUserInternalRequest request);
-
     GetUserResponse getUser(String orgUUID, String userId);
-
     ListUsersResponse listUsers(ListUsersRequest request, String orgUuid);
 }
