@@ -8,10 +8,10 @@ import java.util.Objects;
 
 @Component("CreateUserResponseConverter")
 public class CreateUserResponseConverter
-        implements InternalResponseToExternalResponseConverter<CreateUserInternalResponse, CreateUserResponse> {
+        extends InternalResponseToExternalResponseConverter<CreateUserInternalResponse, CreateUserResponse> {
 
     @Override
-    public CreateUserResponse toExternal(CreateUserInternalResponse internal) {
+    protected CreateUserResponse convert(CreateUserInternalResponse internal) {
         if (Objects.isNull(internal)) {
             return null;
         }
@@ -20,7 +20,6 @@ public class CreateUserResponseConverter
                 .username(internal.getUsername())
                 .status(internal.getStatus())
                 .message(internal.getMessage())
-                .httpStatus(mapHttpStatus(internal.getResponseReasonCode()))
                 .build();
     }
 
