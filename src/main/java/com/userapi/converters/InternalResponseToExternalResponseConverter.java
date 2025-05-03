@@ -29,6 +29,8 @@ public abstract class InternalResponseToExternalResponseConverter<I extends Base
             case BAD_REQUEST -> HttpStatus.BAD_REQUEST;
             case INTERNAL_SERVER_ERROR, UNKNOWN -> HttpStatus.INTERNAL_SERVER_ERROR;
             case EXTERNAL_ERROR -> HttpStatus.FAILED_DEPENDENCY;
+            case ENTITY_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case DUPLICATED_ENTITY -> HttpStatus.CONFLICT;
             default -> HttpStatus.OK;
         };
     }

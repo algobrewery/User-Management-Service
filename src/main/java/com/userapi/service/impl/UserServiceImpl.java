@@ -1,20 +1,25 @@
 package com.userapi.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.userapi.converters.EmploymentInfoDtoToJobProfileConverter;
 import com.userapi.exception.DuplicateResourceException;
 import com.userapi.exception.ResourceNotFoundException;
 import com.userapi.models.entity.JobProfile;
 import com.userapi.models.entity.UserProfile;
 import com.userapi.models.entity.UserReportee;
 import com.userapi.models.entity.UserStatus;
-import com.userapi.models.external.*;
+import com.userapi.models.external.GetUserResponse;
+import com.userapi.models.external.JobProfileInfo;
+import com.userapi.models.external.ListUsersFilterCriteriaAttribute;
+import com.userapi.models.external.ListUsersRequest;
+import com.userapi.models.external.ListUsersResponse;
+import com.userapi.models.external.ListUsersSelector;
 import com.userapi.models.internal.CreateUserInternalRequest;
 import com.userapi.models.internal.CreateUserInternalResponse;
-import com.userapi.models.internal.EmploymentInfoDto;
+import com.userapi.models.internal.ResponseReasonCode;
 import com.userapi.models.internal.ResponseResult;
 import com.userapi.repository.JobProfileRepository;
 import com.userapi.repository.UserProfileRepository;
-import com.userapi.repository.UserProfileRepositoryCustom;
 import com.userapi.repository.UserReporteeRepository;
 import com.userapi.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -24,9 +29,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.userapi.models.internal.ResponseReasonCode;
+
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -34,9 +45,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
+    // Converters
+    private final EmploymentInfoDtoToJobProfileConverter employmentInfoDtoToJobProfileConverter;
+
+    // Repositories
     private final UserProfileRepository userProfileRepository;
     private final JobProfileRepository jobProfileRepository;
     private final UserReporteeRepository userReporteeRepository;
+
+    // Utility
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -61,47 +78,12 @@ public class UserServiceImpl implements UserService {
             }
         }
 
-        // Create JobProfiles
-        List<String> jobProfileUuids = new ArrayList<>();
+        List<JobProfile> jobProfileEntityList = employmentInfoDtoToJobProfileConverter.convertList(
+                request.getEmploymentInfoList(),
+                request.getRequestContext().getAppOrgUuid());
+        jobProfileRepository.saveAll(jobProfileEntityList);
 
-        // Use the start date of the earliest job profile
-        LocalDateTime earliestStartDate = request.getEmploymentInfoList().stream()
-                .map(EmploymentInfoDto::getStartDate)
-                .min(LocalDateTime::compareTo)
-                .orElse(LocalDateTime.now());
-
-        for (EmploymentInfoDto emp : request.getEmploymentInfoList()) {
-            JobProfile jobProfile = JobProfile.builder()
-                    .jobProfileUuid(UUID.randomUUID().toString())
-                    .organizationUuid(request.getRequestContext().getAppOrgUuid())
-                    .title(emp.getJobTitle())
-                    .startDate(emp.getStartDate())
-                    .endDate(emp.getEndDate())
-                    .reportingManager(emp.getReportingManager())
-                    .organizationUnit(emp.getOrganizationUnit())
-                    .extensionsData(writeJson(emp.getExtensionsData()))
-                    .build();
-            jobProfileRepository.save(jobProfile);
-            jobProfileUuids.add(jobProfile.getJobProfileUuid());
-        }
-
-        UserProfile userProfile = UserProfile.builder()
-                .userUuid(UUID.randomUUID().toString())
-                .organizationUuid(request.getRequestContext().getAppOrgUuid())
-                .username(request.getUsername())
-                .firstName(request.getFirstName())
-                .middleName(request.getMiddleName())
-                .lastName(request.getLastName())
-                .startDate(earliestStartDate)
-                .endDate(null)
-                .jobProfileUuids(jobProfileUuids.toArray(new String[0]))
-                .email(request.getEmailInfo().getEmail())
-                .emailVerificationStatus(request.getEmailInfo().getVerificationStatus())
-                .phone(request.getPhoneInfo().getNumber())
-                .phoneCountryCode(request.getPhoneInfo().getCountryCode())
-                .phoneVerificationStatus(request.getPhoneInfo().getVerificationStatus())
-                .status(UserStatus.ACTIVE.getName())
-                .build();
+        UserProfile userProfile = buildUserProfile(request, jobProfileEntityList);
         userProfileRepository.save(userProfile);
 
         return CreateUserInternalResponse.builder()
@@ -110,7 +92,37 @@ public class UserServiceImpl implements UserService {
                 .status(userProfile.getStatus())
                 .message("User created successfully")
                 .responseResult(ResponseResult.SUCCESS)
-                .responseReasonCode(ResponseReasonCode.CREATED_SUCCESSFULLY)
+                .responseReasonCode(ResponseReasonCode.SUCCESS)
+                .build();
+    }
+
+    private UserProfile buildUserProfile(CreateUserInternalRequest request,
+                                         List<JobProfile> jobProfileEntityList) {
+        // Use the start date of the earliest job profile
+        LocalDateTime earliestStartDate = jobProfileEntityList.stream()
+                .map(JobProfile::getStartDate)
+                .min(LocalDateTime::compareTo)
+                .orElse(LocalDateTime.now());
+
+        List<String> jobProfileUuids = jobProfileEntityList.stream()
+                .map(JobProfile::getJobProfileUuid)
+                .toList();
+
+        return UserProfile.builder()
+                .userUuid(UUID.randomUUID().toString())
+                .organizationUuid(request.getRequestContext().getAppOrgUuid())
+                .username(request.getUsername())
+                .firstName(request.getFirstName())
+                .middleName(request.getMiddleName())
+                .lastName(request.getLastName())
+                .startDate(earliestStartDate)
+                .jobProfileUuids(jobProfileUuids.toArray(new String[0]))
+                .email(request.getEmailInfo().getEmail())
+                .emailVerificationStatus(request.getEmailInfo().getVerificationStatus())
+                .phone(request.getPhoneInfo().getNumber())
+                .phoneCountryCode(request.getPhoneInfo().getCountryCode())
+                .phoneVerificationStatus(request.getPhoneInfo().getVerificationStatus())
+                .status(UserStatus.ACTIVE.getName())
                 .build();
     }
 
