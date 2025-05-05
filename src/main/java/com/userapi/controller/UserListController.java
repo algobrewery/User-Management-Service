@@ -2,6 +2,7 @@ package com.userapi.controller;
 
 import com.userapi.models.external.ListUsersRequest;
 import com.userapi.models.external.ListUsersResponse;
+import com.userapi.models.external.UserHierarchyResponse;
 import com.userapi.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -31,4 +32,13 @@ public class UserListController {
         ListUsersResponse response = userService.listUsers(request, orgUuid);
         return ResponseEntity.ok(response);
     }
+    @GetMapping("/{userId}/hierarchy")
+    public ResponseEntity<UserHierarchyResponse> getUserHierarchy(
+            @RequestHeader(APP_ORG_UUID) String orgUUID,
+            @PathVariable String userId) {
+
+        UserHierarchyResponse response = userService.getUserHierarchy(orgUUID, userId);
+        return ResponseEntity.ok(response);
+    }
+
 }
