@@ -69,4 +69,22 @@ public class UserController {
         GetUserResponse response = userService.getUser(orgUUID, userId);
         return ResponseEntity.ok(response);
     }
+        @PutMapping("/{userId}")
+    public ResponseEntity<UpdateUserResponse> updateUser(
+            @RequestHeader(APP_ORG_UUID) String orgUuid,
+            @PathVariable String userId,
+            @Valid @RequestBody UpdateUserRequest request) {
+
+        UpdateUserResponse response = userService.updateUser(orgUuid, userId, request);
+        return ResponseEntity.ok(response);
+    }
+    @DeleteMapping("/{userId}")
+    public ResponseEntity<UpdateUserResponse> deactivateUser(
+            @RequestHeader(APP_ORG_UUID) String orgUuid,
+            @PathVariable String userId) {
+
+        UpdateUserResponse response = userService.deactivateUser(orgUuid, userId);
+        return ResponseEntity.ok(response);
+    }
+
 }
