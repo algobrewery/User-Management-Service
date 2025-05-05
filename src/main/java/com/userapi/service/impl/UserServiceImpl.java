@@ -291,4 +291,121 @@ public class UserServiceImpl implements UserService {
             return new HashMap<>();
         }
     }
+        @Transactional
+    public UpdateUserResponse updateUser(String orgUuid, String userId, UpdateUserRequest request) {
+        UserProfile user = userProfileRepository.findByUserId(orgUuid, userId);
+        if (user == null) {
+            throw new ResourceNotFoundException("User not found: " + userId);
+        }
+
+        // Update basic fields
+        if (request.getFirstName() != null) user.setFirstName(request.getFirstName());
+        if (request.getLastName() != null) user.setLastName(request.getLastName());
+
+        if (request.getPhone() != null) {
+            String phone = request.getPhone();
+            if (phone.startsWith("+")) {
+                String digits = phone.substring(1);
+                if (digits.length() > 10) {
+                    String countryCodeStr = digits.substring(0, digits.length() - 10);
+                    try {
+                        Integer countryCode = Integer.valueOf(countryCodeStr);
+                        user.setPhoneCountryCode(countryCode);
+                    } catch (NumberFormatException e) {
+                        throw new IllegalArgumentException("Invalid phone country code: " + countryCodeStr);
+                    }
+                    user.setPhone(digits.substring(digits.length() - 10));
+                } else {
+                    user.setPhone(digits);
+                }
+            } else {
+                user.setPhone(phone);
+            }
+
+        }
+
+        if (request.getStatus() != null) user.setStatus(request.getStatus());
+
+        // Update current job profile
+        UpdateUserRequest.CurrentJobProfile currentJobProfileDto = request.getCurrentJobProfile();
+        if (currentJobProfileDto != null) {
+            List<JobProfile> jobProfiles = new ArrayList<>();
+            for (String jpUuid : user.getJobProfileUuids()) {
+                jobProfileRepository.findById(jpUuid).ifPresent(jobProfiles::add);
+            }
+            jobProfiles.sort(Comparator.comparing(JobProfile::getStartDate).reversed());
+
+            JobProfile currentJobProfile = jobProfiles.stream()
+                    .filter(jp -> jp.getEndDate() == null)
+                    .findFirst()
+                    .orElse(jobProfiles.isEmpty() ? null : jobProfiles.get(0));
+
+            if (currentJobProfile == null) {
+                currentJobProfile = JobProfile.builder()
+                        .jobProfileUuid(UUID.randomUUID().toString())
+                        .organizationUuid(orgUuid)
+                        .build();
+                jobProfiles.add(currentJobProfile);
+            }
+
+            if (currentJobProfileDto.getJobTitle() != null) currentJobProfile.setTitle(currentJobProfileDto.getJobTitle());
+            if (currentJobProfileDto.getStartDate() != null) currentJobProfile.setStartDate(currentJobProfileDto.getStartDate());
+            currentJobProfile.setEndDate(currentJobProfileDto.getEndDate());
+            if (currentJobProfileDto.getReportingManager() != null) currentJobProfile.setReportingManager(currentJobProfileDto.getReportingManager());
+            if (currentJobProfileDto.getOrganizationUnit() != null) currentJobProfile.setOrganizationUnit(currentJobProfileDto.getOrganizationUnit());
+            if (currentJobProfileDto.getExtensionsData() != null) currentJobProfile.setExtensionsData(writeJson(currentJobProfileDto.getExtensionsData()));
+
+            jobProfileRepository.save(currentJobProfile);
+
+            // Add new job profile UUID if not present
+            if (!Arrays.asList(user.getJobProfileUuids()).contains(currentJobProfile.getJobProfileUuid())) {
+                List<String> updatedJobProfileUuids = new ArrayList<>(Arrays.asList(user.getJobProfileUuids()));
+                updatedJobProfileUuids.add(currentJobProfile.getJobProfileUuid());
+                user.setJobProfileUuids(updatedJobProfileUuids.toArray(new String[0]));
+            }
+
+            // Update reportees
+            if (currentJobProfileDto.getReportees() != null) {
+                userReporteeRepository.deleteByJobProfileUuid(currentJobProfile.getJobProfileUuid());
+
+                for (String reporteeUserId : currentJobProfileDto.getReportees()) {
+                    UserReportee reportee = UserReportee.builder()
+                            .relationUuid(UUID.randomUUID().toString())  // <-- assign UUID here
+                            .organizationUuid(user.getOrganizationUuid()) // set organizationUuid as well
+                            .jobProfileUuid(currentJobProfile.getJobProfileUuid())
+                            .managerUserUuid(user.getUserUuid())
+                            .userUuid(reporteeUserId)
+                            .build();
+                    userReporteeRepository.save(reportee);
+
+                }
+            }
+        }
+
+        userProfileRepository.save(user);
+
+        return UpdateUserResponse.builder()
+                .userId(user.getUserUuid())
+                .message("User updated successfully")
+                .build();
+    }
+    @Transactional
+    @Override
+    public UpdateUserResponse deactivateUser(String orgUuid, String userId) {
+        UserProfile user = userProfileRepository.findByUserId(orgUuid, userId);
+        if (user == null) {
+            throw new ResourceNotFoundException("User not found: " + userId);
+        }
+
+        user.setStatus("Inactive");
+        userProfileRepository.save(user);
+
+        return UpdateUserResponse.builder()
+                .userId(user.getUserUuid())
+                .message("User deactivated successfully")
+                .status(user.getStatus())
+                .build();
+    }
+
+
 }
