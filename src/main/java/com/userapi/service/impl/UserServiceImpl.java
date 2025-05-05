@@ -8,12 +8,7 @@ import com.userapi.models.entity.JobProfile;
 import com.userapi.models.entity.UserProfile;
 import com.userapi.models.entity.UserReportee;
 import com.userapi.models.entity.UserStatus;
-import com.userapi.models.external.GetUserResponse;
-import com.userapi.models.external.JobProfileInfo;
-import com.userapi.models.external.ListUsersFilterCriteriaAttribute;
-import com.userapi.models.external.ListUsersRequest;
-import com.userapi.models.external.ListUsersResponse;
-import com.userapi.models.external.ListUsersSelector;
+import com.userapi.models.external.*;
 import com.userapi.models.internal.CreateUserInternalRequest;
 import com.userapi.models.internal.CreateUserInternalResponse;
 import com.userapi.models.internal.ResponseReasonCode;
@@ -29,8 +24,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.userapi.models.external.UpdateUserRequest;
-import com.userapi.models.external.UpdateUserResponse;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -402,6 +395,57 @@ public class UserServiceImpl implements UserService {
                 .status(user.getStatus())
                 .build();
     }
+    @Transactional(readOnly = true)
+    public UserHierarchyResponse getUserHierarchy(String orgUUID, String userId) {
+        UserProfile user = Optional.ofNullable(userProfileRepository.findByUserId(orgUUID, userId))
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
+        UserHierarchyResponse response = new UserHierarchyResponse();
+        response.setUserId(user.getUserUuid());
 
+        // Fetch reporting manager
+        JobProfile currentJobProfile = getCurrentJobProfile(user);
+        if (currentJobProfile != null && currentJobProfile.getReportingManager() != null) {
+            UserProfile manager = userProfileRepository.findByUserId(orgUUID, currentJobProfile.getReportingManager());
+            if (manager != null) {
+                UserHierarchyResponse.UserInfo managerInfo = new UserHierarchyResponse.UserInfo();
+                managerInfo.setUserId(manager.getUserUuid());
+                managerInfo.setName(manager.getFirstName() + " " + manager.getLastName());
+                response.setReportingManager(managerInfo);
+            }
+        }
+
+        // Fetch reportees
+        List<UserReportee> reporteeRelations = userReporteeRepository.findByManagerUserUuid(user.getUserUuid());
+        List<UserHierarchyResponse.UserInfo> reportees = reporteeRelations.stream()
+                .map(rel -> {
+                    UserProfile reportee = userProfileRepository.findByUserId(orgUUID, rel.getUserUuid());
+                    if (reportee != null) {
+                        UserHierarchyResponse.UserInfo reporteeInfo = new UserHierarchyResponse.UserInfo();
+                        reporteeInfo.setUserId(reportee.getUserUuid());
+                        reporteeInfo.setName(reportee.getFirstName() + " " + reportee.getLastName());
+                        return reporteeInfo;
+                    }
+                    return null;
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        response.setReportees(reportees);
+
+        return response;
+    }
+
+    private JobProfile getCurrentJobProfile(UserProfile user) {
+        List<JobProfile> jobProfiles = new ArrayList<>();
+        for (String jpUuid : user.getJobProfileUuids()) {
+            jobProfileRepository.findById(jpUuid).ifPresent(jobProfiles::add);
+        }
+        jobProfiles.sort(Comparator.comparing(JobProfile::getStartDate).reversed());
+
+        return jobProfiles.stream()
+                .filter(jp -> jp.getEndDate() == null)
+                .findFirst()
+                .orElse(jobProfiles.isEmpty() ? null : jobProfiles.get(0));
+    }
 }
