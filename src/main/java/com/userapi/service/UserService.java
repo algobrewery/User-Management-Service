@@ -5,6 +5,9 @@ import com.userapi.models.external.ListUsersRequest;
 import com.userapi.models.external.ListUsersResponse;
 import com.userapi.models.internal.CreateUserInternalRequest;
 import com.userapi.models.internal.CreateUserInternalResponse;
+import com.userapi.models.external.UpdateUserRequest;
+import com.userapi.models.external.UpdateUserResponse;
+
 
 public interface UserService {
     CreateUserInternalResponse createUser(CreateUserInternalRequest request);
