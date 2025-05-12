@@ -8,6 +8,8 @@ import com.userapi.models.external.GetUserResponse;
 import com.userapi.models.internal.CreateUserInternalRequest;
 import com.userapi.models.internal.CreateUserInternalResponse;
 import com.userapi.service.UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
@@ -24,6 +26,7 @@ import static com.userapi.common.constants.HeaderConstants.*;
 @RestController
 @RequestMapping("/user")
 public class UserController {
+    private static final Logger logger = LoggerFactory.getLogger(UserController.class);
 
     private final CreateUserRequestConverter createUserRequestConverter;
     private final CreateUserResponseConverter createUserResponseConverter;
@@ -48,6 +51,8 @@ public class UserController {
             @RequestHeader(APP_REGION_ID) String regionID,
             @Valid @RequestBody CreateUserRequest request) {
 
+        logger.info("Creating user for org: {}, user: {}, traceId: {}", orgUUID, userUUID, traceID);
+
         CreateUserInternalRequest internalRequest = createUserRequestConverter.toInternal(
                 orgUUID,
                 userUUID,
@@ -57,6 +62,8 @@ public class UserController {
                 request);
         CreateUserInternalResponse internalResponse = userService.createUser(internalRequest);
         CreateUserResponse externalResponse = createUserResponseConverter.toExternal(internalResponse);
+
+        logger.info("User created successfully with ID: {}", externalResponse.getUserId());
         return new ResponseEntity<>(externalResponse, HttpStatus.CREATED);
     }
 
@@ -69,25 +76,35 @@ public class UserController {
             @RequestHeader(APP_REGION_ID) String regionID,
             @PathVariable String userId) {
 
+        logger.info("Fetching user with ID: {} for org: {}, traceId: {}", userId, orgUUID, traceID);
+
         GetUserResponse response = userService.getUser(orgUUID, userId);
+        logger.info("User fetched successfully for ID: {}", userId);
         return ResponseEntity.ok(response);
     }
-        @PutMapping("/{userId}")
+
+    @PutMapping("/{userId}")
     public ResponseEntity<UpdateUserResponse> updateUser(
             @RequestHeader(APP_ORG_UUID) String orgUuid,
             @PathVariable String userId,
             @Valid @RequestBody UpdateUserRequest request) {
 
+        logger.info("Updating user with ID: {} for org: {}", userId, orgUuid);
+
         UpdateUserResponse response = userService.updateUser(orgUuid, userId, request);
+        logger.info("User updated successfully for ID: {}", userId);
         return ResponseEntity.ok(response);
     }
+
     @DeleteMapping("/{userId}")
     public ResponseEntity<UpdateUserResponse> deactivateUser(
             @RequestHeader(APP_ORG_UUID) String orgUuid,
             @PathVariable String userId) {
 
+        logger.info("Deactivating user with ID: {} for org: {}", userId, orgUuid);
+
         UpdateUserResponse response = userService.deactivateUser(orgUuid, userId);
+        logger.info("User deactivated successfully for ID: {}", userId);
         return ResponseEntity.ok(response);
     }
-
 }
