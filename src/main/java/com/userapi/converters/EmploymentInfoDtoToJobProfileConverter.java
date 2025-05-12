@@ -3,6 +3,8 @@ package com.userapi.converters;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.userapi.models.entity.JobProfile;
 import com.userapi.models.internal.EmploymentInfoDto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +15,8 @@ import java.util.UUID;
 
 @Component("EmploymentInfoDtoToJobProfileConverter")
 public class EmploymentInfoDtoToJobProfileConverter {
+    private static final Logger logger = LoggerFactory.getLogger(EmploymentInfoDtoToJobProfileConverter.class);
+
 
     private final ObjectMapper objectMapper;
 
@@ -30,6 +34,9 @@ public class EmploymentInfoDtoToJobProfileConverter {
      * @return List of JobProfile entities (not yet persisted)
      */
     public List<JobProfile> convertList(List<EmploymentInfoDto> employmentInfoList, String organizationUuid) {
+        logger.debug("Converting {} employment info records for org: {}",
+                employmentInfoList != null ? employmentInfoList.size() : 0, organizationUuid);
+
         if (Objects.isNull(employmentInfoList)) {
             return null;
         }
@@ -39,32 +46,30 @@ public class EmploymentInfoDtoToJobProfileConverter {
     }
 
     public JobProfile convert(EmploymentInfoDto employmentInfo, String organizationUuid) {
+        logger.debug("Converting employment info for org: {}, job title: {}",
+                organizationUuid, employmentInfo.getJobTitle());
+
         if (Objects.isNull(employmentInfo)) {
             return null;
         }
 
         return JobProfile.builder()
-                    .jobProfileUuid(UUID.randomUUID().toString())
-                    .organizationUuid(organizationUuid)
-                    .title(employmentInfo.getJobTitle())
-                    .startDate(employmentInfo.getStartDate())
-                    .endDate(employmentInfo.getEndDate())
-                    .reportingManager(employmentInfo.getReportingManager())
-                    .organizationUnit(employmentInfo.getOrganizationUnit())
-                    .extensionsData(writeJson(employmentInfo.getExtensionsData()))
-                    .build();
+                .jobProfileUuid(UUID.randomUUID().toString())
+                .organizationUuid(organizationUuid)
+                .title(employmentInfo.getJobTitle())
+                .startDate(employmentInfo.getStartDate())
+                .endDate(employmentInfo.getEndDate())
+                .reportingManager(employmentInfo.getReportingManager())
+                .organizationUnit(employmentInfo.getOrganizationUnit())
+                .extensionsData(writeJson(employmentInfo.getExtensionsData()))
+                .build();
     }
 
-    /**
-     * Converts a map to a JSON string.
-     *
-     * @param map Map to be converted to JSON
-     * @return JSON string representation of the map
-     */
     private String writeJson(Map<String, Object> map) {
         try {
             return objectMapper.writeValueAsString(map);
         } catch (Exception e) {
+            logger.error("Error converting map to JSON: ", e);
             return "{}";
         }
     }
