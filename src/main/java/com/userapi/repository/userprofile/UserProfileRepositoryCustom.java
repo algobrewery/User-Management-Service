@@ -1,4 +1,4 @@
-package com.userapi.repository;
+package com.userapi.repository.userprofile;
 
 import com.userapi.models.entity.UserProfile;
 import org.springframework.data.domain.Page;

@@ -33,15 +33,6 @@ public class CreateUserRequestConverter
 
     @Override
     protected CreateUserInternalRequest toInternal(CreateUserRequest external) {
-        // Create a dummy RequestContext that will be replaced by the parent class
-        RequestContext dummyContext = RequestContext.builder()
-                .appOrgUuid("dummy")
-                .appUserUuid("dummy")
-                .appClientUserSessionUuid("dummy")
-                .traceId("dummy")
-                .regionId("dummy")
-                .build();
-
         return CreateUserInternalRequest.builder()
                 .username(external.getUsername())
                 .firstName(external.getFirstName())
@@ -49,7 +40,6 @@ public class CreateUserRequestConverter
                 .emailInfo(emailInfoConverter.doForward(external.getEmailInfo()))
                 .phoneInfo(phoneInfoConverter.doForward(external.getPhoneInfo()))
                 .employmentInfoList(convertEmploymentInfo(external.getEmploymentInfoList()))
-                .requestContext(dummyContext)  // Add the dummy context here
                 .build();
     }
 

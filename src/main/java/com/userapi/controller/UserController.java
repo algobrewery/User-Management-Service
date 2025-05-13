@@ -21,11 +21,14 @@ import com.userapi.models.external.UpdateUserResponse;
 
 import javax.validation.Valid;
 
+import java.util.concurrent.ExecutionException;
+
 import static com.userapi.common.constants.HeaderConstants.*;
 
 @RestController
 @RequestMapping("/user")
 public class UserController {
+
     private static final Logger logger = LoggerFactory.getLogger(UserController.class);
 
     private final CreateUserRequestConverter createUserRequestConverter;
@@ -60,11 +63,20 @@ public class UserController {
                 traceID,
                 regionID,
                 request);
-        CreateUserInternalResponse internalResponse = userService.createUser(internalRequest);
-        CreateUserResponse externalResponse = createUserResponseConverter.toExternal(internalResponse);
-
-        logger.info("User created successfully with ID: {}", externalResponse.getUserId());
-        return new ResponseEntity<>(externalResponse, HttpStatus.CREATED);
+        try {
+            return userService.createUser(internalRequest)
+                    .thenApply(createUserResponseConverter::toExternal)
+                    .thenApply(r -> new ResponseEntity<>(r, HttpStatus.CREATED))
+                    .get();
+        } catch (ExecutionException | InterruptedException e) {
+            logger.error("Exception in creating user", e);
+            return new ResponseEntity<>(
+                    CreateUserResponse.builder()
+                            .message(e.getMessage())
+                            .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .build(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @GetMapping("/{userId}")

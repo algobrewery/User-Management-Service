@@ -1,4 +1,4 @@
-package com.userapi.repository;
+package com.userapi.repository.userreportee;
 
 import com.userapi.models.entity.UserReportee;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -11,17 +11,21 @@ import com.userapi.models.entity.UserStatus;
 import com.userapi.models.external.*;
 import com.userapi.models.internal.CreateUserInternalRequest;
 import com.userapi.models.internal.CreateUserInternalResponse;
+import com.userapi.models.internal.EmploymentInfoDto;
 import com.userapi.models.internal.ResponseReasonCode;
 import com.userapi.models.internal.ResponseResult;
-import com.userapi.repository.JobProfileRepository;
-import com.userapi.repository.UserProfileRepository;
-import com.userapi.repository.UserReporteeRepository;
+import com.userapi.repository.jobprofile.JobProfileRepository;
+import com.userapi.repository.jobprofile.JobProfileSpecifications;
+import com.userapi.repository.userprofile.UserProfileRepository;
+import com.userapi.repository.userreportee.UserReporteeRepository;
 import com.userapi.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
@@ -29,13 +33,27 @@ import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static com.userapi.repository.jobprofile.JobProfileSpecifications.withJobProfileUuids;
+import static com.userapi.repository.jobprofile.JobProfileSpecifications.withOrganizationUuid;
+import static com.userapi.repository.jobprofile.JobProfileSpecifications.withOverlappingDates;
+import static com.userapi.repository.jobprofile.JobProfileSpecifications.withReportingManager;
 
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
+
     private static final Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
+
+    private final ExecutorService executor = Executors.newFixedThreadPool(
+            Runtime.getRuntime().availableProcessors() // or set your desired thread count
+    );
 
     // Converters
     private final EmploymentInfoDtoToJobProfileConverter employmentInfoDtoToJobProfileConverter;
@@ -49,64 +67,199 @@ public class UserServiceImpl implements UserService {
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public CreateUserInternalResponse createUser(CreateUserInternalRequest request) {
+    public CompletableFuture<CreateUserInternalResponse> createUser(CreateUserInternalRequest request) {
         logger.info("Starting user creation for username: {}, org: {}",
                 request.getUsername(), request.getRequestContext().getAppOrgUuid());
+        String userUuid = UUID.randomUUID().toString();
+        String orgUuid = request.getRequestContext().getAppOrgUuid();
+        return validateUniqueUser(request)
+                .thenCompose(this::getReportingManagersMatchingJobProfileUuids)
+                .thenCompose(v -> createJobProfiles(userUuid, orgUuid, v))
+                .thenCompose(v -> buildUserProfile(userUuid, request, v))
+                .thenCompose(v -> CompletableFuture.completedFuture(userProfileRepository.save(v)))
+                .thenApply(this::buildCreateUserInternalResponse)
+                .exceptionally(this::handleCreateUserException);
+    }
 
+    private CreateUserInternalResponse buildCreateUserInternalResponse(UserProfile v) {
+        return CreateUserInternalResponse.builder()
+                .userId(v.getUserUuid())
+                .username(v.getUsername())
+                .status(v.getStatus())
+                .message("User created successfully")
+                .responseResult(ResponseResult.SUCCESS)
+                .responseReasonCode(ResponseReasonCode.SUCCESS)
+                .build();
+    }
+
+    private CreateUserInternalResponse handleCreateUserException(Throwable ex) {
+        logger.error("Exception in creating user", ex);
+        Throwable cause = ex instanceof CompletionException ? ex.getCause() : ex;
+
+        // Build error response based on exception type
+        if (cause instanceof ResourceNotFoundException) {
+            return CreateUserInternalResponse.builder()
+                    .message("Resource not found: " + cause.getMessage())
+                    .responseResult(ResponseResult.FAILURE)
+                    .responseReasonCode(ResponseReasonCode.ENTITY_NOT_FOUND)
+                    .build();
+        } else {
+            return CreateUserInternalResponse.builder()
+                    .message("Internal server error: " + cause.getMessage())
+                    .responseResult(ResponseResult.FAILURE)
+                    .responseReasonCode(ResponseReasonCode.INTERNAL_SERVER_ERROR)
+                    .build();
+        }
+    }
+
+    private CompletableFuture<CreateUserInternalRequest> validateUniqueUser(CreateUserInternalRequest request) {
         try {
-            // Check for duplicate username, email, or phone (single DB call)
             List<UserProfile> conflicts = userProfileRepository.findUsersMatchingAny(
                     request.getRequestContext().getAppOrgUuid(),
                     request.getUsername(),
                     request.getEmailInfo().getEmail(),
                     request.getPhoneInfo().getNumber()
             );
-
+            Set<String> matchedAttributes = new HashSet<>();
             for (UserProfile user : conflicts) {
                 if (user.getUsername().equals(request.getUsername())) {
-                    logger.warn("Duplicate username found: {}", request.getUsername());
-                    throw new DuplicateResourceException("Username already exists");
+                    matchedAttributes.add("username");
                 }
                 if (user.getEmail().equals(request.getEmailInfo().getEmail())) {
-                    logger.warn("Duplicate email found: {}", request.getEmailInfo().getEmail());
-                    throw new DuplicateResourceException("Email already exists");
+                    matchedAttributes.add("email");
                 }
                 if (user.getPhone().equals(request.getPhoneInfo().getNumber())) {
-                    logger.warn("Duplicate phone number found: {}", request.getPhoneInfo().getNumber());
-                    throw new DuplicateResourceException("Phone number already exists");
+                    matchedAttributes.add("phone");
                 }
             }
+            if (matchedAttributes.isEmpty()) {
+                logger.debug("validated user is unique");
+                return CompletableFuture.completedFuture(request);
+            }
 
-            logger.debug("No conflicts found, proceeding with user creation");
-
-            List<JobProfile> jobProfileEntityList = employmentInfoDtoToJobProfileConverter.convertList(
-                    request.getEmploymentInfoList(),
-                    request.getRequestContext().getAppOrgUuid());
-            logger.debug("Created {} job profiles", jobProfileEntityList.size());
-
-            jobProfileRepository.saveAll(jobProfileEntityList);
-            logger.debug("Saved job profiles to database");
-
-            UserProfile userProfile = buildUserProfile(request, jobProfileEntityList);
-            userProfileRepository.save(userProfile);
-            logger.info("User created successfully with ID: {}", userProfile.getUserUuid());
-
-            return CreateUserInternalResponse.builder()
-                    .userId(userProfile.getUserUuid())
-                    .username(userProfile.getUsername())
-                    .status(userProfile.getStatus())
-                    .message("User created successfully")
-                    .responseResult(ResponseResult.SUCCESS)
-                    .responseReasonCode(ResponseReasonCode.SUCCESS)
-                    .build();
+            String errorMessage = String.format("found existing users matching attributes: %s", matchedAttributes);
+            logger.error(errorMessage);
+            return CompletableFuture.failedFuture(new DuplicateResourceException(errorMessage));
         } catch (Exception e) {
-            logger.error("Error creating user: ", e);
-            throw e;
+            return CompletableFuture.failedFuture(e);
         }
     }
 
-    private UserProfile buildUserProfile(CreateUserInternalRequest request,
-                                         List<JobProfile> jobProfileEntityList) {
+    private CompletableFuture<Map<EmploymentInfoDto, List<JobProfile>>> getReportingManagersMatchingJobProfileUuids(
+            CreateUserInternalRequest request) {
+        String orgUuid = request.getRequestContext().getAppOrgUuid();
+        try {
+            if (request.getEmploymentInfoList().isEmpty()) {
+                return CompletableFuture.completedFuture(Collections.emptyMap());
+            }
+            Set<String> incomingReportingManagerUuidSet = request.getEmploymentInfoList()
+                    .stream()
+                    .map(EmploymentInfoDto::getReportingManager)
+                    .collect(Collectors.toSet());
+            logger.debug("Attempting to fetch reportingManagers with uuids:{}", incomingReportingManagerUuidSet);
+
+            List<UserProfile> reportingManagerProfiles = userProfileRepository.findByUserIdsIn(
+                    orgUuid,
+                    incomingReportingManagerUuidSet);
+            Map<String, UserProfile> reportingManagerProfilesMap = reportingManagerProfiles.stream()
+                    .collect(Collectors.toUnmodifiableMap(
+                            UserProfile::getUserUuid,
+                            Function.identity()));
+            logger.debug("Found user profiles for reportingManagers with uuids:{}", reportingManagerProfilesMap.keySet());
+
+            incomingReportingManagerUuidSet.removeAll(reportingManagerProfilesMap.keySet());
+            if (!incomingReportingManagerUuidSet.isEmpty()) {
+                String errMessage = String.format("Unable to find reportingManagers:%s", incomingReportingManagerUuidSet);
+                logger.error(errMessage);
+                return CompletableFuture.failedFuture(new ResourceNotFoundException(errMessage));
+            }
+
+            List<CompletableFuture<Pair<EmploymentInfoDto, List<JobProfile>>>> futures = request.getEmploymentInfoList()
+                    .stream()
+                    .map(eid ->
+                            CompletableFuture.supplyAsync(()->
+                                            Pair.of(
+                                                    eid,
+                                                    findMatchingReportingManagerJobProfiles(
+                                                            eid,
+                                                            reportingManagerProfilesMap,
+                                                            orgUuid)
+                                            ),
+                                            executor))
+                    .toList();
+            return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                    .thenApply(v ->
+                            futures.stream()
+                                   .map(CompletableFuture::join)
+                                   .collect(Collectors.toUnmodifiableMap(Pair::getFirst, Pair::getSecond)));
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    private List<JobProfile> findMatchingReportingManagerJobProfiles(
+            EmploymentInfoDto employmentInfoDto,
+            Map<String, UserProfile> reportingManagerProfilesMap,
+            String orgUuid) {
+        String reportingManagerUuid = employmentInfoDto.getReportingManager();
+        List<String> reportingManagerJobProfileUuids = Arrays.asList(
+                reportingManagerProfilesMap.get(reportingManagerUuid).getJobProfileUuids());
+        Specification<JobProfile> spec = withOrganizationUuid(orgUuid)
+                .and(withJobProfileUuids(reportingManagerJobProfileUuids))
+                .and(withOverlappingDates(employmentInfoDto.getStartDate(), employmentInfoDto.getEndDate()));
+        return jobProfileRepository.findAll(spec);
+    }
+
+    private CompletableFuture<List<JobProfile>> createJobProfiles(
+            String userUuid,
+            String orgUuid,
+            Map<EmploymentInfoDto, List<JobProfile>> managerJobProfilesByEmploymentInfoDto) {
+        try {
+            List<CompletableFuture<JobProfile>> futures = managerJobProfilesByEmploymentInfoDto.entrySet()
+                    .stream()
+                    .map(entry -> CompletableFuture.supplyAsync(() ->
+                                    createJobProfile(userUuid, orgUuid, entry.getKey(), entry.getValue()),
+                                    executor))
+                    .toList();
+
+            List<JobProfile> incomingUserSavedJobProfiles = futures.stream().map(CompletableFuture::join).toList();
+            List<String> savedJobProfileUuids = incomingUserSavedJobProfiles.stream()
+                            .map(JobProfile::getJobProfileUuid)
+                            .toList();
+            logger.debug("Saved jobProfiles with uuids:{}", savedJobProfileUuids);
+            return CompletableFuture.completedFuture(incomingUserSavedJobProfiles);
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    private JobProfile createJobProfile(
+            String userUuid,
+            String orgUuid,
+            EmploymentInfoDto employmentInfoDto,
+            List<JobProfile> reportingManagerMatchingJobProfiles) {
+        String reportingManagerUuid = employmentInfoDto.getReportingManager();
+        JobProfile savedJobProfile = jobProfileRepository.save(
+                employmentInfoDtoToJobProfileConverter.convert(employmentInfoDto, orgUuid));
+        List<UserReportee> userReporteeEntries = reportingManagerMatchingJobProfiles.stream()
+                .map(jp -> UserReportee.builder()
+                        .jobProfileUuid(jp.getJobProfileUuid())
+                        .userUuid(userUuid)
+                        .managerUserUuid(reportingManagerUuid)
+                        .organizationUuid(orgUuid)
+                        .relationUuid(UUID.randomUUID().toString())
+                        .build())
+                .toList();
+        userReporteeRepository.saveAll(userReporteeEntries);
+        logger.debug("Saved JobProfileUuid:{} with userReporteeEntries:{}",
+                savedJobProfile.getJobProfileUuid(), userReporteeEntries);
+        return savedJobProfile;
+    }
+
+    private CompletableFuture<UserProfile> buildUserProfile(
+            String userUuid,
+            CreateUserInternalRequest request,
+            List<JobProfile> jobProfileEntityList) {
         logger.debug("Building user profile for username: {}", request.getUsername());
 
         // Use the start date of the earliest job profile
@@ -119,8 +272,8 @@ public class UserServiceImpl implements UserService {
                 .map(JobProfile::getJobProfileUuid)
                 .toList();
 
-        return UserProfile.builder()
-                .userUuid(UUID.randomUUID().toString())
+        return CompletableFuture.completedFuture(UserProfile.builder()
+                .userUuid(userUuid)
                 .organizationUuid(request.getRequestContext().getAppOrgUuid())
                 .username(request.getUsername())
                 .firstName(request.getFirstName())
@@ -134,7 +287,7 @@ public class UserServiceImpl implements UserService {
                 .phoneCountryCode(request.getPhoneInfo().getCountryCode())
                 .phoneVerificationStatus(request.getPhoneInfo().getVerificationStatus())
                 .status(UserStatus.ACTIVE.getName())
-                .build();
+                .build());
     }
 
     @Transactional(readOnly = true)

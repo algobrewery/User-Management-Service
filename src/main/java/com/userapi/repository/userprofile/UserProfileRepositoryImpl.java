@@ -1,4 +1,4 @@
-package com.userapi.repository;
+package com.userapi.repository.userprofile;
 
 import com.userapi.models.entity.UserProfile;
 import org.slf4j.Logger;
@@ -12,8 +12,6 @@ import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.*;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

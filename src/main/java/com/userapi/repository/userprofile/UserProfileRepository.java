@@ -1,15 +1,12 @@
-package com.userapi.repository;
+package com.userapi.repository.userprofile;
 
 import com.userapi.models.entity.UserProfile;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Map;
 
 @Repository
 public interface UserProfileRepository extends JpaRepository<UserProfile, String>, UserProfileRepositoryCustom {
@@ -22,4 +19,8 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, String
     @Query("SELECT u FROM UserProfile u WHERE u.organizationUuid = :orgUuid AND u.userUuid = :userUuid")
     UserProfile findByUserId(@Param("orgUuid") String orgUuid,
                              @Param("userUuid") String userUuid);
+
+    @Query("SELECT u FROM UserProfile u WHERE u.organizationUuid = :orgUuid AND u.userUuid IN :userUuids")
+    List<UserProfile> findByUserIdsIn(@Param("orgUuid") String orgUuid,
+                                      @Param("userUuids") Iterable<String> userUuids);
 }
