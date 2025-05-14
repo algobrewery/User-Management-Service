@@ -12,8 +12,17 @@ import java.util.List;
 
 @Repository
 public interface UserReporteeRepository extends JpaRepository<UserReportee, String> {
-    List<UserReportee> findByManagerUserUuid(String managerUserUuid);
-    List<UserReportee> findByJobProfileUuid(String jobProfileUuid);
+
+    @Query("SELECT r FROM UserReportee r WHERE r.organizationUuid = :organizationUuid AND r.managerUserUuid = :managerUserUuid")
+    List<UserReportee> findByManagerUserUuid(
+            @Param("organizationUuid") String organizationUuid,
+            @Param("managerUserUuid") String managerUserUuid);
+
+    @Query("SELECT r FROM UserReportee r WHERE r.organizationUuid = :organizationUuid AND r.jobProfileUuid = :jobProfileUuid")
+    List<UserReportee> findByJobProfileUuid(
+            @Param("organizationUuid") String organizationUuid,
+            @Param("jobProfileUuid") String jobProfileUuid);
+
     @Transactional
     @Modifying
     @Query("DELETE FROM UserReportee ur WHERE ur.jobProfileUuid = :jobProfileUuid")

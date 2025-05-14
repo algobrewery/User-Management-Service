@@ -1,6 +1,7 @@
 package com.userapi.models.external;
 
 import lombok.Data;
+
 import javax.validation.Valid;
 import javax.validation.constraints.Min;
 

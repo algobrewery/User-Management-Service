@@ -1,12 +1,16 @@
 package com.userapi.models.external;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+@EqualsAndHashCode(callSuper = true)
 @Data
-public class GetUserResponse {
+@SuperBuilder
+public class GetUserResponse extends BaseResponse {
     private String userId;
     private String username;
     private String firstName;
@@ -17,6 +21,5 @@ public class GetUserResponse {
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private String status;
-    private JobProfileInfo currentJobProfile;
-    private List<JobProfileInfo> previousJobProfiles;
+    private List<JobProfileInfo> jobProfiles;
 }

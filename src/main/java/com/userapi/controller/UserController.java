@@ -2,11 +2,15 @@ package com.userapi.controller;
 
 import com.userapi.converters.CreateUserRequestConverter;
 import com.userapi.converters.CreateUserResponseConverter;
+import com.userapi.converters.GetUserRequestConverter;
+import com.userapi.converters.GetUserResponseConverter;
 import com.userapi.models.external.CreateUserRequest;
 import com.userapi.models.external.CreateUserResponse;
 import com.userapi.models.external.GetUserResponse;
+import com.userapi.models.external.UpdateUserRequest;
+import com.userapi.models.external.UpdateUserResponse;
 import com.userapi.models.internal.CreateUserInternalRequest;
-import com.userapi.models.internal.CreateUserInternalResponse;
+import com.userapi.models.internal.GetUserInternalRequest;
 import com.userapi.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,16 +18,24 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import com.userapi.models.external.UpdateUserRequest;
-import com.userapi.models.external.UpdateUserResponse;
-
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import javax.validation.Valid;
-
 import java.util.concurrent.ExecutionException;
 
-import static com.userapi.common.constants.HeaderConstants.*;
+import static com.userapi.common.constants.HeaderConstants.APP_CLIENT_USER_SESSION_UUID;
+import static com.userapi.common.constants.HeaderConstants.APP_ORG_UUID;
+import static com.userapi.common.constants.HeaderConstants.APP_REGION_ID;
+import static com.userapi.common.constants.HeaderConstants.APP_TRACE_ID;
+import static com.userapi.common.constants.HeaderConstants.APP_USER_UUID;
 
 @RestController
 @RequestMapping("/user")
@@ -33,15 +45,21 @@ public class UserController {
 
     private final CreateUserRequestConverter createUserRequestConverter;
     private final CreateUserResponseConverter createUserResponseConverter;
+    private final GetUserRequestConverter getUserRequestConverter;
+    private final GetUserResponseConverter getUserResponseConverter;
     private final UserService userService;
 
     @Autowired
     public UserController(
             @Qualifier("CreateUserRequestConverter") CreateUserRequestConverter createUserRequestConverter,
             @Qualifier("CreateUserResponseConverter") CreateUserResponseConverter createUserResponseConverter,
+            @Qualifier("GetUserRequestConverter") GetUserRequestConverter getUserRequestConverter,
+            @Qualifier("GetUserResponseConverter") GetUserResponseConverter getUserResponseConverter,
             UserService userService) {
         this.createUserRequestConverter = createUserRequestConverter;
         this.createUserResponseConverter = createUserResponseConverter;
+        this.getUserRequestConverter = getUserRequestConverter;
+        this.getUserResponseConverter = getUserResponseConverter;
         this.userService = userService;
     }
 
@@ -90,9 +108,26 @@ public class UserController {
 
         logger.info("Fetching user with ID: {} for org: {}, traceId: {}", userId, orgUUID, traceID);
 
-        GetUserResponse response = userService.getUser(orgUUID, userId);
-        logger.info("User fetched successfully for ID: {}", userId);
-        return ResponseEntity.ok(response);
+        try {
+            GetUserInternalRequest internalRequest = getUserRequestConverter.toInternal(
+                    orgUUID,
+                    userUUID,
+                    clientUserSessionUUID,
+                    traceID,
+                    regionID,
+                    userId);
+            return userService.getUser(internalRequest)
+                    .thenApply(getUserResponseConverter::toExternal)
+                    .thenApply(ResponseEntity::ok)
+                    .get();
+        } catch (ExecutionException | InterruptedException e) {
+            logger.error("Exception in creating user", e);
+            return new ResponseEntity<>(
+                    GetUserResponse.builder()
+                            .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .build(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @PutMapping("/{userId}")

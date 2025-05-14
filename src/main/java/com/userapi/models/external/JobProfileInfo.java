@@ -1,5 +1,6 @@
 package com.userapi.models.external;
 
+import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -7,8 +8,10 @@ import java.util.List;
 import java.util.Map;
 
 @Data
+@Builder
 public class JobProfileInfo {
 
+    private String jobProfileUuid;
     private String jobTitle;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
