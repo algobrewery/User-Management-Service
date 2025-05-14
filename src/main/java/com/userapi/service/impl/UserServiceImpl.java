@@ -37,6 +37,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -51,9 +52,7 @@ public class UserServiceImpl implements UserService {
 
     private static final Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
 
-    private final ExecutorService executor = Executors.newFixedThreadPool(
-            Runtime.getRuntime().availableProcessors() // or set your desired thread count
-    );
+    private final ExecutorService executor = Executors.newFixedThreadPool(5);
 
     // Converters
     private final EmploymentInfoDtoToJobProfileConverter employmentInfoDtoToJobProfileConverter;
@@ -185,7 +184,12 @@ public class UserServiceImpl implements UserService {
                                                             reportingManagerProfilesMap,
                                                             orgUuid)
                                             ),
-                                            executor))
+                                            executor)
+                                    .completeOnTimeout(
+                                            Pair.of(eid, Collections.emptyList()),
+                                            500,
+                                            TimeUnit.MILLISECONDS
+                                    ))
                     .toList();
             return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                     .thenApply(v ->
@@ -219,7 +223,8 @@ public class UserServiceImpl implements UserService {
                     .stream()
                     .map(entry -> CompletableFuture.supplyAsync(() ->
                                     createJobProfile(userUuid, orgUuid, entry.getKey(), entry.getValue()),
-                                    executor))
+                                    executor)
+                            .completeOnTimeout(null, 500, TimeUnit.MILLISECONDS))
                     .toList();
 
             List<JobProfile> incomingUserSavedJobProfiles = futures.stream().map(CompletableFuture::join).toList();

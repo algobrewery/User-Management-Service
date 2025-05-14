@@ -12,16 +12,16 @@ public abstract class ExternalRequestToInternalRequestConverter<I, O extends Bas
             String traceID,
             String regionID,
             final I external) {
-        O internalRequest = toInternal(external);
-        internalRequest.setRequestContext(RequestContext.builder()
-                .appOrgUuid(orgUUID)
-                .appUserUuid(userUUID)
-                .appClientUserSessionUuid(clientUserSessionUUID)
-                .traceId(traceID)
-                .regionId(regionID)
-                .build());
-        return internalRequest;
+        return toInternal(
+                RequestContext.builder()
+                        .appOrgUuid(orgUUID)
+                        .appUserUuid(userUUID)
+                        .appClientUserSessionUuid(clientUserSessionUUID)
+                        .traceId(traceID)
+                        .regionId(regionID)
+                        .build(),
+                external);
     }
 
-    protected abstract O toInternal(I external);
+    protected abstract O toInternal(RequestContext rc, I external);
 }

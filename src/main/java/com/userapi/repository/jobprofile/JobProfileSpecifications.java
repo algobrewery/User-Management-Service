@@ -13,7 +13,7 @@ public class JobProfileSpecifications {
             if (orgUuid == null) {
                 return null;
             }
-            return cb.equal(root.get("organization_uuid"), orgUuid);
+            return cb.equal(root.get("organizationUuid"), orgUuid);
         };
     }
 
@@ -22,7 +22,7 @@ public class JobProfileSpecifications {
             if (reportingManagerUuid == null) {
                 return null;
             }
-            return cb.equal(root.get("reporting_manager"), reportingManagerUuid);
+            return cb.equal(root.get("reportingManager"), reportingManagerUuid);
         };
     }
 
@@ -32,9 +32,9 @@ public class JobProfileSpecifications {
                 return null;
             }
             if (end == null) {
-                return cb.isNull(root.get("end_date"));
+                return cb.isNull(root.get("endDate"));
             }
-            return cb.not(cb.or(cb.lessThan(root.get("end_date"), start), cb.greaterThan(root.get("start_date"), end)));
+            return cb.not(cb.or(cb.lessThan(root.get("endDate"), start), cb.greaterThan(root.get("startDate"), end)));
         };
     }
 
@@ -43,7 +43,7 @@ public class JobProfileSpecifications {
             if (uuids == null || uuids.isEmpty()) {
                 return null;
             }
-            return root.get("job_profile_uuid").in(uuids);
+            return root.get("jobProfileUuid").in(uuids);
         };
     }
 

@@ -32,7 +32,7 @@ public class CreateUserRequestConverter
     }
 
     @Override
-    protected CreateUserInternalRequest toInternal(CreateUserRequest external) {
+    protected CreateUserInternalRequest toInternal(RequestContext rc, CreateUserRequest external) {
         return CreateUserInternalRequest.builder()
                 .username(external.getUsername())
                 .firstName(external.getFirstName())
@@ -40,6 +40,7 @@ public class CreateUserRequestConverter
                 .emailInfo(emailInfoConverter.doForward(external.getEmailInfo()))
                 .phoneInfo(phoneInfoConverter.doForward(external.getPhoneInfo()))
                 .employmentInfoList(convertEmploymentInfo(external.getEmploymentInfoList()))
+                .requestContext(rc)
                 .build();
     }
 
