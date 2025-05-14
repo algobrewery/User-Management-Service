@@ -21,6 +21,39 @@ jobs:
     - name: Build with Maven
       run: mvn clean package -DskipTests
 
+    - name: Create systemd service file on EC2
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ec2-user
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # Create systemd service file
+          sudo bash -c 'cat > /etc/systemd/system/user-api.service <<EOF
+          [Unit]
+          Description=User-Management-Service
+          After=network.target
+  
+          [Service]
+          User=ec2-user
+          WorkingDirectory=/home/ec2-user/user-api
+          ExecStart=/usr/bin/java -jar /home/ec2-user/user-api/app.jar
+          SuccessExitStatus=143
+          TimeoutStopSec=10
+          Restart=on-failure
+          RestartSec=5
+          # Journald-specific logging configuration
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=user-api
+          LogLevelMax=debug
+          # Environment variables for logging
+          Environment=JAVA_TOOL_OPTIONS="-Dlogging.file.path=/var/log/user-api -Dlogging.file.name=application.log"
+  
+          [Install]
+          WantedBy=multi-user.target
+          EOF'
+
     - name: Copy JAR to EC2
       uses: appleboy/scp-action@v0.1.7
       with:
@@ -28,7 +61,7 @@ jobs:
         username: ec2-user
         key: ${{ secrets.EC2_SSH_KEY }}
         source: target/user-api-0.0.1-SNAPSHOT.jar
-        target: /home/ec2-user/
+        target: /home/ec2-user/user-api
 
     - name: Restart Spring Boot service on EC2
       uses: appleboy/ssh-action@v1.0.3
