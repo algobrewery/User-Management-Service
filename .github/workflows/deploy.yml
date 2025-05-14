@@ -70,5 +70,8 @@ jobs:
         username: ec2-user
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
+          sudo systemctl daemon-reload
+          sudo systemctl enable user-api
+          sudo systemctl stop user-api
           sudo systemctl restart user-api
           sudo systemctl status user-api
