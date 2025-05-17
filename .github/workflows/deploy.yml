@@ -66,8 +66,6 @@ jobs:
             LogLevelMax=debug
             # Environment variables for logging
             Environment=JAVA_TOOL_OPTIONS="-Dlogging.file.path=/var/log/user-api -Dlogging.file.name=application.log"
-            ExecStartPre=/home/ec2-user/health-check.sh
-            TimeoutStartSec=30  # Wait 30 seconds for app to start
             
             [Install]
             WantedBy=multi-user.target
