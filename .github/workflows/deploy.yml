@@ -67,7 +67,7 @@ jobs:
             LogLevelMax=debug
             # Environment variables for logging
             Environment=JAVA_TOOL_OPTIONS="-Dlogging.file.path=/var/log/user-api -Dlogging.file.name=application.log"
-            ExecStartPost=/bin/sleep 15 # wait 15seconds for service to startup
+            ExecStartPost=/bin/sleep 15
             ExecStartPost=/home/ec2-user/deep-health-check.sh
             
             [Install]
