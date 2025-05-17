@@ -4,10 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.userapi.models.entity.JobProfile;
 import com.userapi.models.entity.UserProfile;
 import com.userapi.models.external.GetUserResponse;
-import com.userapi.models.external.GetUserResponse.GetUserResponseBuilder;
 import com.userapi.models.external.JobProfileInfo;
-import com.userapi.models.internal.CreateUserInternalResponse;
-import com.userapi.models.internal.GetUserInternalRequest;
 import com.userapi.models.internal.GetUserInternalResponse;
 import com.userapi.service.impl.UserServiceImpl;
 import org.slf4j.Logger;
@@ -21,7 +18,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.Objects.isNull;

@@ -23,4 +23,16 @@ public interface UserProfileRepository extends JpaRepository<UserProfile, String
     @Query("SELECT u FROM UserProfile u WHERE u.organizationUuid = :orgUuid AND u.userUuid IN :userUuids")
     List<UserProfile> findByUserIdsIn(@Param("orgUuid") String orgUuid,
                                       @Param("userUuids") Iterable<String> userUuids);
+
+    @Query("SELECT u FROM UserProfile u WHERE u.organizationUuid = :orgUuid AND u.username = :username")
+    UserProfile findUserByUsername(@Param("orgUuid") String orgUuid,
+                                   @Param("username") String username);
+
+    @Query("SELECT u FROM UserProfile u WHERE u.organizationUuid = :orgUuid AND u.phone = :phone")
+    UserProfile findUserByPhoneNumber(@Param("orgUuid") String orgUuid,
+                                      @Param("phone") String phone);
+
+    @Query("SELECT u FROM UserProfile u WHERE u.organizationUuid = :orgUuid AND u.email = :email")
+    UserProfile findUserByEmail(@Param("orgUuid") String orgUuid,
+                                @Param("email") String email);
 }

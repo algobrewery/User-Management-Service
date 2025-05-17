@@ -4,6 +4,8 @@ import com.userapi.converters.CreateUserRequestConverter;
 import com.userapi.converters.CreateUserResponseConverter;
 import com.userapi.converters.GetUserRequestConverter;
 import com.userapi.converters.GetUserResponseConverter;
+import com.userapi.converters.UpdateUserRequestConverter;
+import com.userapi.converters.UpdateUserResponseConverter;
 import com.userapi.models.external.CreateUserRequest;
 import com.userapi.models.external.CreateUserResponse;
 import com.userapi.models.external.GetUserResponse;
@@ -11,6 +13,7 @@ import com.userapi.models.external.UpdateUserRequest;
 import com.userapi.models.external.UpdateUserResponse;
 import com.userapi.models.internal.CreateUserInternalRequest;
 import com.userapi.models.internal.GetUserInternalRequest;
+import com.userapi.models.internal.UpdateUserInternalRequest;
 import com.userapi.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +50,8 @@ public class UserController {
     private final CreateUserResponseConverter createUserResponseConverter;
     private final GetUserRequestConverter getUserRequestConverter;
     private final GetUserResponseConverter getUserResponseConverter;
+    private final UpdateUserRequestConverter updateUserRequestConverter;
+    private final UpdateUserResponseConverter updateUserResponseConverter;
     private final UserService userService;
 
     @Autowired
@@ -55,11 +60,15 @@ public class UserController {
             @Qualifier("CreateUserResponseConverter") CreateUserResponseConverter createUserResponseConverter,
             @Qualifier("GetUserRequestConverter") GetUserRequestConverter getUserRequestConverter,
             @Qualifier("GetUserResponseConverter") GetUserResponseConverter getUserResponseConverter,
+            @Qualifier("UpdateUserRequestConverter") UpdateUserRequestConverter updateUserRequestConverter,
+            @Qualifier("UpdateUserResponseConverter") UpdateUserResponseConverter updateUserResponseConverter,
             UserService userService) {
         this.createUserRequestConverter = createUserRequestConverter;
         this.createUserResponseConverter = createUserResponseConverter;
         this.getUserRequestConverter = getUserRequestConverter;
         this.getUserResponseConverter = getUserResponseConverter;
+        this.updateUserRequestConverter = updateUserRequestConverter;
+        this.updateUserResponseConverter = updateUserResponseConverter;
         this.userService = userService;
     }
 
@@ -121,7 +130,7 @@ public class UserController {
                     .thenApply(ResponseEntity::ok)
                     .get();
         } catch (ExecutionException | InterruptedException e) {
-            logger.error("Exception in creating user", e);
+            logger.error("Exception in fetching user", e);
             return new ResponseEntity<>(
                     GetUserResponse.builder()
                             .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -132,15 +141,36 @@ public class UserController {
 
     @PutMapping("/{userId}")
     public ResponseEntity<UpdateUserResponse> updateUser(
-            @RequestHeader(APP_ORG_UUID) String orgUuid,
+            @RequestHeader(APP_ORG_UUID) String orgUUID,
+            @RequestHeader(APP_USER_UUID) String userUUID,
+            @RequestHeader(APP_CLIENT_USER_SESSION_UUID) String clientUserSessionUUID,
+            @RequestHeader(APP_TRACE_ID) String traceID,
+            @RequestHeader(APP_REGION_ID) String regionID,
             @PathVariable String userId,
             @Valid @RequestBody UpdateUserRequest request) {
 
-        logger.info("Updating user with ID: {} for org: {}", userId, orgUuid);
+        logger.info("Updating user with ID: {} for org: {}", userId, orgUUID);
 
-        UpdateUserResponse response = userService.updateUser(orgUuid, userId, request);
-        logger.info("User updated successfully for ID: {}", userId);
-        return ResponseEntity.ok(response);
+        try {
+            UpdateUserInternalRequest internalRequest = updateUserRequestConverter.toInternal(
+                    orgUUID,
+                    userUUID,
+                    clientUserSessionUUID,
+                    traceID,
+                    regionID,
+                    request);
+            return userService.updateUser(userId, internalRequest)
+                    .thenApply(updateUserResponseConverter::toExternal)
+                    .thenApply(ResponseEntity::ok)
+                    .get();
+        } catch (ExecutionException | InterruptedException e) {
+            logger.error("Exception in updating user", e);
+            return new ResponseEntity<>(
+                    UpdateUserResponse.builder()
+                            .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .build(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @DeleteMapping("/{userId}")
@@ -150,8 +180,18 @@ public class UserController {
 
         logger.info("Deactivating user with ID: {} for org: {}", userId, orgUuid);
 
-        UpdateUserResponse response = userService.deactivateUser(orgUuid, userId);
-        logger.info("User deactivated successfully for ID: {}", userId);
-        return ResponseEntity.ok(response);
+        try {
+            return userService.deactivateUser(orgUuid, userId)
+                    .thenApply(updateUserResponseConverter::toExternal)
+                    .thenApply(ResponseEntity::ok)
+                    .get();
+        } catch (ExecutionException | InterruptedException e) {
+            logger.error("Exception in updating user", e);
+            return new ResponseEntity<>(
+                    UpdateUserResponse.builder()
+                            .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .build(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 }

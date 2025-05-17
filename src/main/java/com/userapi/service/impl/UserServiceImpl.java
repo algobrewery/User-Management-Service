@@ -8,13 +8,10 @@ import com.userapi.models.entity.JobProfile;
 import com.userapi.models.entity.UserProfile;
 import com.userapi.models.entity.UserReportee;
 import com.userapi.models.entity.UserStatus;
-import com.userapi.models.external.GetUserResponse;
-import com.userapi.models.external.JobProfileInfo;
 import com.userapi.models.external.ListUsersFilterCriteriaAttribute;
 import com.userapi.models.external.ListUsersRequest;
 import com.userapi.models.external.ListUsersResponse;
 import com.userapi.models.external.ListUsersSelector;
-import com.userapi.models.external.UpdateUserRequest;
 import com.userapi.models.external.UpdateUserResponse;
 import com.userapi.models.external.UserHierarchyResponse;
 import com.userapi.models.internal.CreateUserInternalRequest;
@@ -24,15 +21,18 @@ import com.userapi.models.internal.GetUserInternalRequest;
 import com.userapi.models.internal.GetUserInternalResponse;
 import com.userapi.models.internal.ResponseReasonCode;
 import com.userapi.models.internal.ResponseResult;
+import com.userapi.models.internal.UpdateUserInternalRequest;
+import com.userapi.models.internal.UpdateUserInternalResponse;
 import com.userapi.repository.jobprofile.JobProfileRepository;
 import com.userapi.repository.jobprofile.JobProfileSpecifications;
 import com.userapi.repository.userprofile.UserProfileRepository;
 import com.userapi.repository.userreportee.UserReporteeRepository;
 import com.userapi.service.UserService;
+import com.userapi.service.tasks.ReportingManagerFetcher;
+import com.userapi.service.tasks.UpdateUserInternalRequestValidator;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.batch.BatchProperties.Job;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -64,9 +64,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static com.userapi.repository.jobprofile.JobProfileSpecifications.withJobProfileUuids;
-import static com.userapi.repository.jobprofile.JobProfileSpecifications.withOrganizationUuid;
-import static com.userapi.repository.jobprofile.JobProfileSpecifications.withOverlappingDates;
 import static java.util.Objects.isNull;
 
 @Service
@@ -86,6 +83,8 @@ public class UserServiceImpl implements UserService {
     private final UserReporteeRepository userReporteeRepository;
 
     // Utility
+    private final ReportingManagerFetcher reportingManagerFetcher;
+    private final UpdateUserInternalRequestValidator updateUserInternalRequestValidator;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -170,71 +169,7 @@ public class UserServiceImpl implements UserService {
     private CompletableFuture<Map<EmploymentInfoDto, List<JobProfile>>> getReportingManagersMatchingJobProfileUuids(
             CreateUserInternalRequest request) {
         String orgUuid = request.getRequestContext().getAppOrgUuid();
-        try {
-            if (request.getEmploymentInfoList().isEmpty()) {
-                return CompletableFuture.completedFuture(Collections.emptyMap());
-            }
-            Set<String> incomingReportingManagerUuidSet = request.getEmploymentInfoList()
-                    .stream()
-                    .map(EmploymentInfoDto::getReportingManager)
-                    .collect(Collectors.toSet());
-            logger.debug("Attempting to fetch reportingManagers with uuids:{}", incomingReportingManagerUuidSet);
-
-            List<UserProfile> reportingManagerProfiles = userProfileRepository.findByUserIdsIn(
-                    orgUuid,
-                    incomingReportingManagerUuidSet);
-            Map<String, UserProfile> reportingManagerProfilesMap = reportingManagerProfiles.stream()
-                    .collect(Collectors.toUnmodifiableMap(
-                            UserProfile::getUserUuid,
-                            Function.identity()));
-            logger.debug("Found user profiles for reportingManagers with uuids:{}", reportingManagerProfilesMap.keySet());
-
-            incomingReportingManagerUuidSet.removeAll(reportingManagerProfilesMap.keySet());
-            if (!incomingReportingManagerUuidSet.isEmpty()) {
-                String errMessage = String.format("Unable to find reportingManagers:%s", incomingReportingManagerUuidSet);
-                logger.error(errMessage);
-                return CompletableFuture.failedFuture(new ResourceNotFoundException(errMessage));
-            }
-
-            List<CompletableFuture<Pair<EmploymentInfoDto, List<JobProfile>>>> futures = request.getEmploymentInfoList()
-                    .stream()
-                    .map(eid ->
-                            CompletableFuture.supplyAsync(()->
-                                            Pair.of(
-                                                    eid,
-                                                    findMatchingReportingManagerJobProfiles(
-                                                            eid,
-                                                            reportingManagerProfilesMap,
-                                                            orgUuid)
-                                            ),
-                                            executor)
-                                    .completeOnTimeout(
-                                            Pair.of(eid, Collections.emptyList()),
-                                            500,
-                                            TimeUnit.MILLISECONDS
-                                    ))
-                    .toList();
-            return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                    .thenApply(v ->
-                            futures.stream()
-                                   .map(CompletableFuture::join)
-                                   .collect(Collectors.toUnmodifiableMap(Pair::getFirst, Pair::getSecond)));
-        } catch (Exception e) {
-            return CompletableFuture.failedFuture(e);
-        }
-    }
-
-    private List<JobProfile> findMatchingReportingManagerJobProfiles(
-            EmploymentInfoDto employmentInfoDto,
-            Map<String, UserProfile> reportingManagerProfilesMap,
-            String orgUuid) {
-        String reportingManagerUuid = employmentInfoDto.getReportingManager();
-        List<String> reportingManagerJobProfileUuids = Arrays.asList(
-                reportingManagerProfilesMap.get(reportingManagerUuid).getJobProfileUuids());
-        Specification<JobProfile> spec = withOrganizationUuid(orgUuid)
-                .and(withJobProfileUuids(reportingManagerJobProfileUuids))
-                .and(withOverlappingDates(employmentInfoDto.getStartDate(), employmentInfoDto.getEndDate()));
-        return jobProfileRepository.findAll(spec);
+        return reportingManagerFetcher.fetchMatchingJobProfileUuids(orgUuid, request.getEmploymentInfoList());
     }
 
     private CompletableFuture<List<JobProfile>> createJobProfiles(
@@ -245,15 +180,15 @@ public class UserServiceImpl implements UserService {
             List<CompletableFuture<JobProfile>> futures = managerJobProfilesByEmploymentInfoDto.entrySet()
                     .stream()
                     .map(entry -> CompletableFuture.supplyAsync(() ->
-                                    createJobProfile(userUuid, orgUuid, entry.getKey(), entry.getValue()),
+                                            createJobProfile(userUuid, orgUuid, entry.getKey(), entry.getValue()),
                                     executor)
                             .completeOnTimeout(null, 500, TimeUnit.MILLISECONDS))
                     .toList();
 
             List<JobProfile> incomingUserSavedJobProfiles = futures.stream().map(CompletableFuture::join).toList();
             List<String> savedJobProfileUuids = incomingUserSavedJobProfiles.stream()
-                            .map(JobProfile::getJobProfileUuid)
-                            .toList();
+                    .map(JobProfile::getJobProfileUuid)
+                    .toList();
             logger.debug("Saved jobProfiles with uuids:{}", savedJobProfileUuids);
             return CompletableFuture.completedFuture(incomingUserSavedJobProfiles);
         } catch (Exception e) {
@@ -374,7 +309,7 @@ public class UserServiceImpl implements UserService {
         logger.debug("populateJobProfilesByUuid fetch jobProfiles for uuids:{}", jobProfileUuidSet);
         try {
             Specification<JobProfile> spec = JobProfileSpecifications.withOrganizationUuid(userProfile.getOrganizationUuid())
-                            .and(JobProfileSpecifications.withJobProfileUuids(new LinkedList<>(jobProfileUuidSet)));
+                    .and(JobProfileSpecifications.withJobProfileUuids(new LinkedList<>(jobProfileUuidSet)));
             Map<String, JobProfile> jobProfilesByUuid = jobProfileRepository.findAll(spec).stream()
                     .collect(Collectors.toUnmodifiableMap(JobProfile::getJobProfileUuid, Function.identity()));
             getUserInternalResponse.setJobProfilesByUuid(jobProfilesByUuid);
@@ -397,15 +332,15 @@ public class UserServiceImpl implements UserService {
                     .entrySet()
                     .stream()
                     .map(entry -> CompletableFuture.supplyAsync(() ->
-                            Pair.of(
-                                    entry.getKey(),
-                                    userReporteeRepository.findByJobProfileUuid(
-                                            entry.getValue().getOrganizationUuid(),
-                                            entry.getValue().getJobProfileUuid())
-                                            .stream()
-                                            .map(UserReportee::getUserUuid)
-                                            .toList()),
-                            executor)
+                                            Pair.of(
+                                                    entry.getKey(),
+                                                    userReporteeRepository.findByJobProfileUuid(
+                                                                    entry.getValue().getOrganizationUuid(),
+                                                                    entry.getValue().getJobProfileUuid())
+                                                            .stream()
+                                                            .map(UserReportee::getUserUuid)
+                                                            .toList()),
+                                    executor)
                             .completeOnTimeout(
                                     Pair.of(entry.getKey(), Collections.emptyList()),
                                     500,
@@ -498,165 +433,126 @@ public class UserServiceImpl implements UserService {
     }
 
     @Transactional
-    public UpdateUserResponse updateUser(String orgUuid, String userId, UpdateUserRequest request) {
-        logger.info("Updating user: {} for org: {}", userId, orgUuid);
-
+    public CompletableFuture<UpdateUserInternalResponse> updateUser(String userId, UpdateUserInternalRequest request) {
+        logger.info("Updating user: {} with request: {}", userId, request);
+        String orgUuid = request.getRequestContext().getAppOrgUuid();
+        final UserProfile user;
         try {
-            UserProfile user = userProfileRepository.findByUserId(orgUuid, userId);
-            if (user == null) {
+            user = userProfileRepository.findByUserId(orgUuid, userId);
+            if (isNull(user)) {
                 logger.warn("User not found for update: {}", userId);
-                throw new ResourceNotFoundException("User not found: " + userId);
+                return CompletableFuture.completedFuture(UpdateUserInternalResponse.builder()
+                        .message("User not found: " + userId)
+                        .responseReasonCode(ResponseReasonCode.ENTITY_NOT_FOUND)
+                        .responseResult(ResponseResult.FAILURE)
+                        .build());
             }
-
-            logger.debug("Found user, applying updates");
-
-            // Update basic fields
-            if (request.getFirstName() != null) {
-                logger.debug("Updating firstName from {} to {}", user.getFirstName(), request.getFirstName());
-                user.setFirstName(request.getFirstName());
-            }
-            if (request.getLastName() != null) {
-                logger.debug("Updating lastName from {} to {}", user.getLastName(), request.getLastName());
-                user.setLastName(request.getLastName());
-            }
-
-            if (request.getPhone() != null) {
-                String phone = request.getPhone();
-                if (phone.startsWith("+")) {
-                    String digits = phone.substring(1);
-                    if (digits.length() > 10) {
-                        String countryCodeStr = digits.substring(0, digits.length() - 10);
-                        try {
-                            Integer countryCode = Integer.valueOf(countryCodeStr);
-                            user.setPhoneCountryCode(countryCode);
-                        } catch (NumberFormatException e) {
-                            logger.error("Invalid phone country code: {}", countryCodeStr);
-                            throw new IllegalArgumentException("Invalid phone country code: " + countryCodeStr);
-                        }
-                        user.setPhone(digits.substring(digits.length() - 10));
-                    } else {
-                        user.setPhone(digits);
-                    }
-                } else {
-                    user.setPhone(phone);
-                }
-            }
-
-            if (request.getStatus() != null) {
-                logger.debug("Updating status from {} to {}", user.getStatus(), request.getStatus());
-                user.setStatus(request.getStatus());
-            }
-
-            // Update current job profile
-            UpdateUserRequest.CurrentJobProfile currentJobProfileDto = request.getCurrentJobProfile();
-            if (currentJobProfileDto != null) {
-                logger.debug("Updating current job profile");
-                List<JobProfile> jobProfiles = new ArrayList<>();
-                for (String jpUuid : user.getJobProfileUuids()) {
-                    jobProfileRepository.findById(jpUuid).ifPresent(jobProfiles::add);
-                }
-                jobProfiles.sort(Comparator.comparing(JobProfile::getStartDate).reversed());
-
-                JobProfile currentJobProfile = jobProfiles.stream()
-                        .filter(jp -> jp.getEndDate() == null)
-                        .findFirst()
-                        .orElse(jobProfiles.isEmpty() ? null : jobProfiles.get(0));
-
-                if (currentJobProfile == null) {
-                    logger.debug("Creating new job profile");
-                    currentJobProfile = JobProfile.builder()
-                            .jobProfileUuid(UUID.randomUUID().toString())
-                            .organizationUuid(orgUuid)
-                            .build();
-                    jobProfiles.add(currentJobProfile);
-                }
-
-                if (currentJobProfileDto.getJobTitle() != null) {
-                    logger.debug("Updating job title from {} to {}",
-                            currentJobProfile.getTitle(), currentJobProfileDto.getJobTitle());
-                    currentJobProfile.setTitle(currentJobProfileDto.getJobTitle());
-                }
-                if (currentJobProfileDto.getStartDate() != null) {
-                    currentJobProfile.setStartDate(currentJobProfileDto.getStartDate());
-                }
-                currentJobProfile.setEndDate(currentJobProfileDto.getEndDate());
-                if (currentJobProfileDto.getReportingManager() != null) {
-                    currentJobProfile.setReportingManager(currentJobProfileDto.getReportingManager());
-                }
-                if (currentJobProfileDto.getOrganizationUnit() != null) {
-                    currentJobProfile.setOrganizationUnit(currentJobProfileDto.getOrganizationUnit());
-                }
-                if (currentJobProfileDto.getExtensionsData() != null) {
-                    currentJobProfile.setExtensionsData(writeJson(currentJobProfileDto.getExtensionsData()));
-                }
-
-                jobProfileRepository.save(currentJobProfile);
-                logger.debug("Saved updated job profile");
-
-                // Add new job profile UUID if not present
-                if (!Arrays.asList(user.getJobProfileUuids()).contains(currentJobProfile.getJobProfileUuid())) {
-                    List<String> updatedJobProfileUuids = new ArrayList<>(Arrays.asList(user.getJobProfileUuids()));
-                    updatedJobProfileUuids.add(currentJobProfile.getJobProfileUuid());
-                    user.setJobProfileUuids(updatedJobProfileUuids.toArray(new String[0]));
-                }
-
-                // Update reportees
-                if (currentJobProfileDto.getReportees() != null) {
-                    logger.debug("Updating reportees, count: {}", currentJobProfileDto.getReportees().size());
-                    userReporteeRepository.deleteByJobProfileUuid(currentJobProfile.getJobProfileUuid());
-
-                    for (String reporteeUserId : currentJobProfileDto.getReportees()) {
-                        UserReportee reportee = UserReportee.builder()
-                                .relationUuid(UUID.randomUUID().toString())
-                                .organizationUuid(user.getOrganizationUuid())
-                                .jobProfileUuid(currentJobProfile.getJobProfileUuid())
-                                .managerUserUuid(user.getUserUuid())
-                                .userUuid(reporteeUserId)
-                                .build();
-                        userReporteeRepository.save(reportee);
-                    }
-                }
-            }
-
-            userProfileRepository.save(user);
-            logger.info("User updated successfully: {}", userId);
-
-            return UpdateUserResponse.builder()
-                    .userId(user.getUserUuid())
-                    .message("User updated successfully")
-                    .build();
         } catch (Exception e) {
-            logger.error("Error updating user: ", e);
-            throw e;
+            return CompletableFuture.completedFuture(handleUpdateUserException(e));
+        }
+        return updateUserInternalRequestValidator.validateUniqueUser(user, request)
+                .thenCompose(req ->
+                        reportingManagerFetcher.fetchMatchingJobProfileUuids(
+                                orgUuid,
+                                Optional.ofNullable(req.getEmploymentInfo())
+                                        .map(Collections::singletonList)
+                                        .orElseGet(Collections::emptyList)))
+                .thenCompose(v -> createJobProfiles(userId, orgUuid, v))
+                .thenApply(v -> v.stream().map(JobProfile::getJobProfileUuid).toList())
+                .thenApply(jobProfileUuidsToAdd -> {
+                    if (!jobProfileUuidsToAdd.isEmpty()) {
+                        List<String> updatedJobProfileUuids = new ArrayList<>(jobProfileUuidsToAdd);
+                        updatedJobProfileUuids.addAll(Arrays.asList(user.getJobProfileUuids()));
+                        String[] updatedJobProfileUuidsArray = updatedJobProfileUuids.toArray(new String[0]);
+                        user.setJobProfileUuids(updatedJobProfileUuidsArray);
+                    }
+                    return user;
+                })
+                .thenApply(u -> {
+                    if (!isNull(request.getUsername())) {
+                        u.setUsername(request.getUsername());
+                    }
+                    if (!isNull(request.getFirstName())) {
+                        u.setFirstName(request.getFirstName());
+                    }
+                    if (!isNull(request.getMiddleName())) {
+                        u.setMiddleName(request.getMiddleName());
+                    }
+                    if (!isNull(request.getLastName())) {
+                        u.setLastName(request.getLastName());
+                    }
+                    if (!isNull(request.getPhoneInfo())) {
+                        u.setPhone(request.getPhoneInfo().getNumber());
+                        u.setPhoneCountryCode(request.getPhoneInfo().getCountryCode());
+                        u.setPhoneVerificationStatus(request.getPhoneInfo().getVerificationStatus());
+                    }
+                    if (!isNull(request.getEmailInfo())) {
+                        u.setEmail(request.getEmailInfo().getEmail());
+                        u.setEmailVerificationStatus(request.getEmailInfo().getVerificationStatus());
+                    }
+                    if (!isNull(request.getStatus())) {
+                        u.setStatus(UserStatus.valueOf(request.getStatus()).getName());
+                    }
+                    return u;
+                })
+                .thenCompose(u -> CompletableFuture.completedFuture(userProfileRepository.save(u)))
+                .thenCompose(this::buildUpdateUserInternalResponse)
+                .exceptionally(this::handleUpdateUserException);
+    }
+
+    private CompletableFuture<UpdateUserInternalResponse> buildUpdateUserInternalResponse(UserProfile userProfile) {
+        return CompletableFuture.completedFuture(UpdateUserInternalResponse.builder()
+                .responseResult(ResponseResult.SUCCESS)
+                .responseReasonCode(ResponseReasonCode.SUCCESS)
+                .message("Updated user successfully")
+                .status(userProfile.getStatus())
+                .build());
+    }
+
+    private UpdateUserInternalResponse handleUpdateUserException(Throwable ex) {
+        logger.error("Exception in updating user", ex);
+        Throwable cause = ex instanceof CompletionException ? ex.getCause() : ex;
+
+        // Build error response based on exception type
+        if (cause instanceof ResourceNotFoundException) {
+            return UpdateUserInternalResponse.builder()
+                    .message("Resource not found: " + cause.getMessage())
+                    .responseResult(ResponseResult.FAILURE)
+                    .responseReasonCode(ResponseReasonCode.ENTITY_NOT_FOUND)
+                    .build();
+        } else {
+            return UpdateUserInternalResponse.builder()
+                    .message("Internal server error: " + cause.getMessage())
+                    .responseResult(ResponseResult.FAILURE)
+                    .responseReasonCode(ResponseReasonCode.INTERNAL_SERVER_ERROR)
+                    .build();
         }
     }
 
     @Transactional
     @Override
-    public UpdateUserResponse deactivateUser(String orgUuid, String userId) {
+    public CompletableFuture<UpdateUserInternalResponse> deactivateUser(String orgUuid, String userId) {
         logger.info("Deactivating user: {} for org: {}", userId, orgUuid);
-
+        final UserProfile user;
         try {
-            UserProfile user = userProfileRepository.findByUserId(orgUuid, userId);
+            user = userProfileRepository.findByUserId(orgUuid, userId);
             if (user == null) {
                 logger.warn("User not found for deactivation: {}", userId);
                 throw new ResourceNotFoundException("User not found: " + userId);
             }
-
-            logger.debug("Current user status: {}", user.getStatus());
-            user.setStatus("Inactive");
-            userProfileRepository.save(user);
-            logger.info("User deactivated successfully: {}", userId);
-
-            return UpdateUserResponse.builder()
-                    .userId(user.getUserUuid())
-                    .message("User deactivated successfully")
-                    .status(user.getStatus())
-                    .build();
         } catch (Exception e) {
-            logger.error("Error deactivating user: ", e);
-            throw e;
+            return CompletableFuture.completedFuture(handleUpdateUserException(e));
         }
+
+        logger.debug("Current user status: {}", user.getStatus());
+        return CompletableFuture.completedFuture(user)
+                        .thenApply(u -> {
+                            u.setStatus(UserStatus.INACTIVE.getName());
+                            return u;
+                        })
+                .thenApply(userProfileRepository::save)
+                .thenCompose(this::buildUpdateUserInternalResponse)
+                .exceptionally(this::handleUpdateUserException);
     }
 
     @Transactional(readOnly = true)
