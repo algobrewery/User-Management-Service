@@ -6,18 +6,8 @@ API_BASE_URL="http://localhost:8080/user"
 # Generate dynamic test data
 TIMESTAMP=$(date +%s)
 USERNAME="testuser_$TIMESTAMP"
-PHONE_NUMBER="808080${TIMESTAMP: -6}"  # Last 6 digits of timestamp
+PHONE_NUMBER="808080${TIMESTAMP: -6}"
 EMAIL="testuser_${TIMESTAMP}@algobrewery.com"
-
-# Headers
-HEADERS=(
-  "-H \"Content-Type: application/json\""
-  "-H \"x-app-org-uuid: 1d2e3f4a-567b-4c8d-910e-abc123456789\""
-  "-H \"x-app-user-uuid: 790b5bc8-820d-4a68-a12d-550cfaca14d5\""
-  "-H \"x-app-client-user-session-uuid: session-12345\""
-  "-H \"x-app-trace-id: trace-${TIMESTAMP}\""
-  "-H \"x-app-region-id: us-east-1\""
-)
 
 # Exit on error
 set -e
@@ -28,9 +18,10 @@ http_request() {
   local url=$2
   local data=$3
   local response
+  local userId=""
 
   echo "Sending $method request to $url"
-  echo "Payload: $data"
+  [ -n "$data" ] && echo "Payload: $data"
 
   if [ -n "$data" ]; then
     response=$(curl -s -X "$method" "$url" \
@@ -62,6 +53,16 @@ http_request() {
   if [ "$status_code" -ge 400 ]; then
     echo "❌ Request failed with status $status_code"
     exit 1
+  fi
+
+  # Extract userId if this is a POST request
+  if [ "$method" = "POST" ]; then
+    userId=$(echo "$body" | jq -r '.userId')
+    if [ -z "$userId" ] || [ "$userId" = "null" ]; then
+      echo "❌ Failed to extract userId from response"
+      exit 1
+    fi
+    echo "$userId" > /tmp/userId.txt
   fi
 
   echo "$body"
@@ -101,4 +102,49 @@ CREATE_PAYLOAD=$(cat <<EOF
 EOF
 )
 
-CREATE_RESPONSE=$(http_request "POST" "$API_BASE_URL" "$CREATE_P
+CREATE_RESPONSE=$(http_request "POST" "$API_BASE_URL" "$CREATE_PAYLOAD")
+TEST_USER_ID=$(cat /tmp/userId.txt)
+
+echo "✅ Created user with ID: $TEST_USER_ID"
+echo "Username: $USERNAME"
+echo "Phone: $PHONE_NUMBER"
+echo "Email: $EMAIL"
+
+### Test 2: Get User
+echo "=== Getting User ==="
+GET_URL="$API_BASE_URL/$TEST_USER_ID"
+http_request "GET" "$GET_URL" ""
+
+### Test 3: Update User
+echo "=== Updating User ==="
+UPDATE_PAYLOAD='{
+  "firstName": "Updated",
+  "lastName": "User"
+}'
+UPDATE_URL="$API_BASE_URL/$TEST_USER_ID"
+http_request "PUT" "$UPDATE_URL" "$UPDATE_PAYLOAD"
+
+### Test 4: Delete User
+echo "=== Deleting User ==="
+DELETE_URL="$API_BASE_URL/$TEST_USER_ID"
+http_request "DELETE" "$DELETE_URL" ""
+
+### Test 5: Verify User Deleted
+echo "=== Verifying User Deletion ==="
+GET_URL="$API_BASE_URL/$TEST_USER_ID"
+if curl -s -o /dev/null -w "%{http_code}" "$GET_URL" \
+   -H "x-app-org-uuid: 1d2e3f4a-567b-4c8d-910e-abc123456789" \
+   -H "x-app-user-uuid: 790b5bc8-820d-4a68-a12d-550cfaca14d5" \
+   -H "x-app-trace-id: trace-$TIMESTAMP" | grep -q "200"; then
+  echo "✅ User deletion verified"
+else
+  echo "❌ User still exists after deletion"
+  exit 1
+fi
+
+# Cleanup
+rm -f /tmp/userId.txt
+
+echo "================================="
+echo "✅ All deep health checks passed!"
+exit 0
