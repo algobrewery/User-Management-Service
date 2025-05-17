@@ -135,6 +135,7 @@ GET_URL="$API_BASE_URL/$TEST_USER_ID"
 if curl -s -o /dev/null -w "%{http_code}" "$GET_URL" \
    -H "x-app-org-uuid: 1d2e3f4a-567b-4c8d-910e-abc123456789" \
    -H "x-app-user-uuid: 790b5bc8-820d-4a68-a12d-550cfaca14d5" \
+   -H "x-app-client-user-session-uuid: session-12345" \
    -H "x-app-trace-id: trace-$TIMESTAMP" | grep -q "200"; then
   echo "✅ User deletion verified"
 else
