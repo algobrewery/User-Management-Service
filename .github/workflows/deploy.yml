@@ -37,7 +37,7 @@ jobs:
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            sudo chmod +x /home/ec2-user/health-check.sh
+            sudo chmod +x /home/ec2-user/deep-health-check.sh
 
       - name: Create systemd service file on EC2
         uses: appleboy/ssh-action@v1.0.3
