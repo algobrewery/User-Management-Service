@@ -8,6 +8,7 @@ import com.userapi.models.internal.RequestContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +34,29 @@ public class CreateUserRequestConverter
 
     @Override
     protected CreateUserInternalRequest toInternal(RequestContext rc, CreateUserRequest external) {
+        if (external == null) {
+            throw new IllegalArgumentException("CreateUserRequest cannot be null");
+        }
+
+        if (!StringUtils.hasText(external.getUsername())) {
+            throw new IllegalArgumentException("Username is required");
+        }
+        if (!StringUtils.hasText(external.getFirstName())) {
+            throw new IllegalArgumentException("First name is required");
+        }
+        if (!StringUtils.hasText(external.getLastName())) {
+            throw new IllegalArgumentException("Last name is required");
+        }
+        if (external.getEmailInfo() == null) {
+            throw new IllegalArgumentException("Email info is required");
+        }
+        if (external.getPhoneInfo() == null) {
+            throw new IllegalArgumentException("Phone info is required");
+        }
+        if (external.getEmploymentInfoList() == null || external.getEmploymentInfoList().isEmpty()) {
+            throw new IllegalArgumentException("At least one employment info is required");
+        }
+
         return CreateUserInternalRequest.builder()
                 .username(external.getUsername())
                 .firstName(external.getFirstName())

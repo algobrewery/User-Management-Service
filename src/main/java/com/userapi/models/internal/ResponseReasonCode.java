@@ -7,5 +7,5 @@ public enum ResponseReasonCode {
     DUPLICATED_ENTITY,
     INTERNAL_SERVER_ERROR,
     EXTERNAL_ERROR,
-    UNKNOWN
+    DUPLICATE_USER, UNKNOWN
 }

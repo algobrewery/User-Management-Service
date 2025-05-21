@@ -6,6 +6,7 @@ import com.userapi.models.entity.UserProfile;
 import com.userapi.models.external.GetUserResponse;
 import com.userapi.models.external.JobProfileInfo;
 import com.userapi.models.internal.GetUserInternalResponse;
+import com.userapi.models.internal.ResponseResult;
 import com.userapi.service.impl.UserServiceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +54,7 @@ public class GetUserResponseConverter
                 .endDate(userProfileOptional.map(UserProfile::getEndDate).orElse(null))
                 .status(userProfileOptional.map(UserProfile::getStatus).orElse(null))
                 .jobProfiles(buildJobProfileInfoList(internal))
-                .httpStatus(HttpStatus.OK) // Example of using a static value
+                .httpStatus(internal.getResponseResult() == ResponseResult.SUCCESS ? HttpStatus.OK : HttpStatus.NOT_FOUND)
                 .build();
     }
 

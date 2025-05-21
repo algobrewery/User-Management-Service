@@ -6,6 +6,7 @@ import com.userapi.converters.GetUserRequestConverter;
 import com.userapi.converters.GetUserResponseConverter;
 import com.userapi.converters.UpdateUserRequestConverter;
 import com.userapi.converters.UpdateUserResponseConverter;
+import com.userapi.exception.DuplicateResourceException;
 import com.userapi.models.external.CreateUserRequest;
 import com.userapi.models.external.CreateUserResponse;
 import com.userapi.models.external.GetUserResponse;
@@ -93,13 +94,31 @@ public class UserController {
         try {
             return userService.createUser(internalRequest)
                     .thenApply(createUserResponseConverter::toExternal)
-                    .thenApply(r -> new ResponseEntity<>(r, HttpStatus.CREATED))
+                    .thenApply(r -> new ResponseEntity<>(r, r.getHttpStatus()))
                     .get();
-        } catch (ExecutionException | InterruptedException e) {
+        } catch (ExecutionException e) {
             logger.error("Exception in creating user", e);
+            Throwable cause = e.getCause();
+            if (cause instanceof DuplicateResourceException) {
+                return new ResponseEntity<>(
+                        CreateUserResponse.builder()
+                                .message(cause.getMessage())
+                                .httpStatus(HttpStatus.BAD_REQUEST)
+                                .build(),
+                        HttpStatus.BAD_REQUEST);
+            }
             return new ResponseEntity<>(
                     CreateUserResponse.builder()
                             .message(e.getMessage())
+                            .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .build(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch (InterruptedException e) {
+            logger.error("Exception in creating user", e);
+            Thread.currentThread().interrupt();
+            return new ResponseEntity<>(
+                    CreateUserResponse.builder()
+                            .message("Request interrupted")
                             .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                             .build(),
                     HttpStatus.INTERNAL_SERVER_ERROR);
@@ -127,7 +146,7 @@ public class UserController {
                     userId);
             return userService.getUser(internalRequest)
                     .thenApply(getUserResponseConverter::toExternal)
-                    .thenApply(ResponseEntity::ok)
+                    .thenApply(response -> new ResponseEntity<>(response, response.getHttpStatus()))
                     .get();
         } catch (ExecutionException | InterruptedException e) {
             logger.error("Exception in fetching user", e);

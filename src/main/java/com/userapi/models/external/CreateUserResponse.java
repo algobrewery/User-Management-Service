@@ -13,5 +13,6 @@ public class CreateUserResponse extends BaseResponse {
     private String username;
     private String status;
     private String message;
+    private CreateUserResponse result;
 
 }

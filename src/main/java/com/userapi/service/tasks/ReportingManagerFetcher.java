@@ -50,7 +50,14 @@ public class ReportingManagerFetcher {
             }
             Set<String> incomingReportingManagerUuidSet = reporteeEmploymentInfoList.stream()
                     .map(EmploymentInfoDto::getReportingManager)
+                    .filter(uuid -> uuid != null && !uuid.isEmpty())
                     .collect(Collectors.toSet());
+            
+            if (incomingReportingManagerUuidSet.isEmpty()) {
+                logger.debug("No reporting managers specified, returning empty map");
+                return CompletableFuture.completedFuture(Collections.emptyMap());
+            }
+            
             logger.debug("Attempting to fetch reportingManagers with uuids:{}", incomingReportingManagerUuidSet);
 
             List<UserProfile> reportingManagerProfiles = userProfileRepository.findByUserIdsIn(

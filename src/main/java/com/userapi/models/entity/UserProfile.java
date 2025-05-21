@@ -48,7 +48,7 @@ public class UserProfile {
     private LocalDateTime endDate;
 
     @Type(type = "string-array")
-    @Column(name = "job_profile_uuids", columnDefinition = "text[]")
+    @Column(name = "job_profile_uuids", columnDefinition = "varchar[]")
     private String[] jobProfileUuids;
 
     @Column(name = "email", nullable = false, unique = true)

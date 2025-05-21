@@ -124,6 +124,12 @@ public class UserServiceImpl implements UserService {
                     .responseResult(ResponseResult.FAILURE)
                     .responseReasonCode(ResponseReasonCode.ENTITY_NOT_FOUND)
                     .build();
+        } else if (cause instanceof DuplicateResourceException) {
+            return CreateUserInternalResponse.builder()
+                    .message(cause.getMessage())
+                    .responseResult(ResponseResult.FAILURE)
+                    .responseReasonCode(ResponseReasonCode.DUPLICATE_USER)
+                    .build();
         } else {
             return CreateUserInternalResponse.builder()
                     .message("Internal server error: " + cause.getMessage())

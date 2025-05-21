@@ -1,4 +1,4 @@
-name: Deploy Spring Boot App to EC2
+name: Deploy Spring Boot App to ECS
 
 on:
   push:
@@ -18,80 +18,26 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build with Maven
-        run: mvn clean package -DskipTests
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Copy deep-health-check.sh to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: deep-health-check.sh
-          target: /home/ec2-user
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Make deep-health-check.sh executable on EC2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            sudo chmod +x /home/ec2-user/deep-health-check.sh
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Create systemd service file on EC2
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Deploy to Amazon ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            # Create systemd service file
-            sudo bash -c 'cat > /etc/systemd/system/user-api.service <<EOF
-            [Unit]
-            Description=User-Management-Service
-            After=network.target
-            
-            [Service]
-            User=ec2-user
-            WorkingDirectory=/home/ec2-user/user-api
-            ExecStart=/usr/bin/java -jar /home/ec2-user/user-api/app.jar
-            SuccessExitStatus=143
-            TimeoutStopSec=10
-            Restart=on-failure
-            RestartSec=5
-            # Journald-specific logging configuration
-            StandardOutput=journal
-            StandardError=journal
-            SyslogIdentifier=user-api
-            LogLevelMax=debug
-            # Environment variables for logging
-            Environment=JAVA_TOOL_OPTIONS="-Dlogging.file.path=/var/log/user-api -Dlogging.file.name=application.log"
-            ExecStartPost=/bin/sleep 15
-            ExecStartPost=/home/ec2-user/deep-health-check.sh
-            
-            [Install]
-            WantedBy=multi-user.target
-            EOF'
-
-      - name: Copy JAR to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: target/user-api-0.0.1-SNAPSHOT.jar
-          target: /home/ec2-user/user-api
-
-      - name: Restart Spring Boot service on EC2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            sudo systemctl daemon-reload
-            sudo systemctl enable user-api
-            sudo systemctl stop user-api
-            sudo systemctl restart user-api
-            sudo systemctl status user-api
+          task-definition: ecs-task-def.json
+          service: ${{ secrets.ECS_SERVICE }}
+          cluster: ${{ secrets.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}

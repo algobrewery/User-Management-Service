@@ -30,12 +30,12 @@ public class EmploymentInfoConverter implements BiDirectionalConverter<Employmen
             return null;
         }
         final EmploymentInfo external = new EmploymentInfo();
-        external.setJobTitle(external.getJobTitle());
-        external.setOrganizationUnit(external.getOrganizationUnit());
-        external.setStartDate(external.getStartDate());
-        external.setEndDate(external.getEndDate());
-        external.setReportingManager(external.getReportingManager());
-        external.setExtensionsData(external.getExtensionsData());
+        external.setJobTitle(internal.getJobTitle());
+        external.setOrganizationUnit(internal.getOrganizationUnit());
+        external.setStartDate(internal.getStartDate());
+        external.setEndDate(internal.getEndDate());
+        external.setReportingManager(internal.getReportingManager());
+        external.setExtensionsData(internal.getExtensionsData());
         return external;
     }
 }
