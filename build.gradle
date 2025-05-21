@@ -40,4 +40,14 @@ dependencies {
 
 test {
     useJUnitPlatform()
-} 
+}
+
+// Ensure we create a fat JAR
+bootJar {
+    enabled = true
+    archiveClassifier = ''
+}
+
+jar {
+    enabled = false
+}
