@@ -6,12 +6,12 @@
     ],
     "cpu": "256",
     "memory": "512",
-    "executionRoleArn": "arn:aws:iam::<YOUR-ACCOUNT-ID>:role/ecsTaskExecutionRole",
-    "taskRoleArn": "arn:aws:iam::<YOUR-ACCOUNT-ID>:role/ecsTaskRole",
+    "executionRoleArn": "arn:aws:iam::038462789766:role/ecsTaskExecutionRole",
+    "taskRoleArn": "arn:aws:iam::038462789766:role/ecsTaskRole",
     "containerDefinitions": [
         {
             "name": "user-management-service",
-            "image": "<YOUR-ACCOUNT-ID>.dkr.ecr.<YOUR-REGION>.amazonaws.com/user-management-service:latest",
+            "image": "038462789766.dkr.ecr.us-east-1.amazonaws.com/user-management-service:latest",
             "essential": true,
             "portMappings": [
                 {
@@ -42,7 +42,7 @@
                 "logDriver": "awslogs",
                 "options": {
                     "awslogs-group": "/ecs/user-management-service",
-                    "awslogs-region": "<YOUR-REGION>",
+                    "awslogs-region": "us-east-1",
                     "awslogs-stream-prefix": "ecs"
                 }
             }
