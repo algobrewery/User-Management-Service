@@ -33,12 +33,24 @@ public class UserReporteeRepositoryTest {
 
         // Then
         assertNotNull(reportees);
-        assertEquals(1, reportees.size());
-        
-        UserReportee reportee = reportees.get(0);
-        assertEquals("test-user-1", reportee.getUserUuid()); // John Doe is the reportee
-        assertEquals(managerUuid, reportee.getManagerUserUuid());
-        assertEquals(orgUuid, reportee.getOrganizationUuid());
+        assertEquals(2, reportees.size()); // Now we have 2 reportees for test-user-2
+
+        // Verify that both test-user-1 and test-user-3 are reportees
+        boolean foundUser1 = false;
+        boolean foundUser3 = false;
+
+        for (UserReportee reportee : reportees) {
+            if ("test-user-1".equals(reportee.getUserUuid())) {
+                foundUser1 = true;
+            } else if ("test-user-3".equals(reportee.getUserUuid())) {
+                foundUser3 = true;
+            }
+            assertEquals(managerUuid, reportee.getManagerUserUuid());
+            assertEquals(orgUuid, reportee.getOrganizationUuid());
+        }
+
+        assertTrue(foundUser1, "test-user-1 should be a reportee");
+        assertTrue(foundUser3, "test-user-3 should be a reportee");
     }
 
     @Test
@@ -67,7 +79,7 @@ public class UserReporteeRepositoryTest {
         // Then
         assertNotNull(reportees);
         assertEquals(1, reportees.size());
-        
+
         UserReportee reportee = reportees.get(0);
         assertEquals("test-user-1", reportee.getUserUuid());
         assertEquals(jobProfileUuid, reportee.getJobProfileUuid());
@@ -94,7 +106,7 @@ public class UserReporteeRepositoryTest {
         // Given
         String orgUuid = "org-1";
         String jobProfileUuid = "job-profile-1";
-        
+
         // Verify reportees exist before deletion
         List<UserReportee> reporteesBefore = userReporteeRepository.findByJobProfileUuid(orgUuid, jobProfileUuid);
         assertFalse(reporteesBefore.isEmpty());
@@ -147,4 +159,4 @@ public class UserReporteeRepositoryTest {
         List<UserReportee> reporteesAfter = userReporteeRepository.findByJobProfileUuid(orgUuid, jobProfileUuid);
         assertTrue(reporteesAfter.isEmpty());
     }
-} 
+}

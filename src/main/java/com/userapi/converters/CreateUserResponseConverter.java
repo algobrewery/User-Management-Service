@@ -39,11 +39,12 @@ public class CreateUserResponseConverter
                 .httpStatus(httpStatus)
                 .build();
 
-        // Create the outer response with the same HTTP status
         return CreateUserResponse.builder()
-                .result(innerResponse)
+                .userId(innerResponse.getUserId())
+                .username(innerResponse.getUsername())
+                .status(innerResponse.getStatus())
+                .message(innerResponse.getMessage())
                 .httpStatus(httpStatus)
-                .message(internal.getMessage())
                 .build();
     }
 }

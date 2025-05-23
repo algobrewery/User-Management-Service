@@ -170,6 +170,11 @@ public class UserController {
 
         logger.info("Updating user with ID: {} for org: {}", userId, orgUUID);
 
+        // Validate required headers
+        if (orgUUID == null || userUUID == null || clientUserSessionUUID == null || traceID == null || regionID == null) {
+            throw new IllegalArgumentException("Missing required headers");
+        }
+
         try {
             UpdateUserInternalRequest internalRequest = updateUserRequestConverter.toInternal(
                     orgUUID,
@@ -199,13 +204,18 @@ public class UserController {
 
         logger.info("Deactivating user with ID: {} for org: {}", userId, orgUuid);
 
+        // Validate required parameters
+        if (orgUuid == null || userId == null) {
+            throw new IllegalArgumentException("Org UUID and User ID cannot be null");
+        }
+
         try {
             return userService.deactivateUser(orgUuid, userId)
                     .thenApply(updateUserResponseConverter::toExternal)
                     .thenApply(ResponseEntity::ok)
                     .get();
         } catch (ExecutionException | InterruptedException e) {
-            logger.error("Exception in updating user", e);
+            logger.error("Exception in deactivating user", e);
             return new ResponseEntity<>(
                     UpdateUserResponse.builder()
                             .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)

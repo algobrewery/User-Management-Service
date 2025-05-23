@@ -1,6 +1,7 @@
 package com.userapi.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.userapi.TestConstants;
 import com.userapi.models.external.ListUsersRequest;
 import com.userapi.models.external.ListUsersResponse;
 import com.userapi.models.external.UserHierarchyResponse;
@@ -21,8 +22,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-// ✅ Import header constants
+// ✅ Import constants
 import static com.userapi.common.constants.HeaderConstants.*;
+import static com.userapi.TestConstants.*;
 
 @WebMvcTest(UserListController.class)
 public class UserListControllerTest {
@@ -39,43 +41,43 @@ public class UserListControllerTest {
     @Test
     void testListUsers() throws Exception {
         ListUsersRequest request = new ListUsersRequest();
-        request.setPage(0);
-        request.setSize(10);
+        request.setPage(DEFAULT_PAGE);
+        request.setSize(DEFAULT_SIZE);
         // Set optional fields if needed
 
         ListUsersResponse mockResponse = new ListUsersResponse();
         mockResponse.setUsers(Collections.emptyList());
         mockResponse.setTotalElements(0L);
         mockResponse.setTotalPages(0);
-        mockResponse.setCurrentPage(0);
-        mockResponse.setPageSize(10);
+        mockResponse.setCurrentPage(DEFAULT_PAGE);
+        mockResponse.setPageSize(DEFAULT_SIZE);
         mockResponse.setHasNext(false);
         mockResponse.setHasPrevious(false);
 
-        Mockito.when(userService.listUsers(any(ListUsersRequest.class), eq("org-uuid")))
+        Mockito.when(userService.listUsers(any(ListUsersRequest.class), eq(LIST_TEST_ORG_UUID)))
                 .thenReturn(mockResponse);
 
         mockMvc.perform(post("/users/filter")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header(APP_ORG_UUID, "org-uuid")
-                        .header(APP_USER_UUID, "user-uuid")
-                        .header(APP_CLIENT_USER_SESSION_UUID, "session-uuid")
-                        .header(APP_TRACE_ID, "trace-id")
-                        .header(APP_REGION_ID, "region-id")
+                        .contentType(JSON_CONTENT_TYPE)
+                        .header(APP_ORG_UUID, LIST_TEST_ORG_UUID)
+                        .header(APP_USER_UUID, LIST_TEST_USER_UUID)
+                        .header(APP_CLIENT_USER_SESSION_UUID, LIST_TEST_SESSION_UUID)
+                        .header(APP_TRACE_ID, LIST_TEST_TRACE_ID)
+                        .header(APP_REGION_ID, LIST_TEST_REGION_ID)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(0))
                 .andExpect(jsonPath("$.totalPages").value(0))
-                .andExpect(jsonPath("$.currentPage").value(0))
-                .andExpect(jsonPath("$.pageSize").value(10))
+                .andExpect(jsonPath("$.currentPage").value(DEFAULT_PAGE))
+                .andExpect(jsonPath("$.pageSize").value(DEFAULT_SIZE))
                 .andExpect(jsonPath("$.hasNext").value(false))
                 .andExpect(jsonPath("$.hasPrevious").value(false));
     }
 
     @Test
     void testGetUserHierarchy() throws Exception {
-        String userId = "user123";
-        String orgUuid = "org-uuid";
+        String userId = TEST_USER_ID;
+        String orgUuid = LIST_TEST_ORG_UUID;
 
         UserHierarchyResponse mockResponse = new UserHierarchyResponse();
         // Optionally populate mockResponse
