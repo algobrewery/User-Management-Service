@@ -203,4 +203,69 @@ class EmploymentInfoConverterTest {
         assertEquals("Manager", dto.getReportingManager());
         assertEquals(Map.of("key1", "value1"), dto.getExtensionsData());
     }
+
+    @Test
+    void doForward_withNullReportingManager_convertsToTBD() {
+        EmploymentInfo external = new EmploymentInfo();
+        external.setJobTitle("Developer");
+        external.setOrganizationUnit("Engineering");
+        external.setStartDate(LocalDateTime.of(2020, 1, 1, 0, 0, 0));
+        external.setEndDate(LocalDateTime.of(2023, 1, 1, 0, 0, 0));
+        external.setReportingManager(null); // Explicitly set to null
+        external.setExtensionsData(Map.of("key1", "value1"));
+
+        EmploymentInfoDto dto = converter.doForward(external);
+
+        assertNotNull(dto);
+        assertEquals("Developer", dto.getJobTitle());
+        assertEquals("Engineering", dto.getOrganizationUnit());
+        assertEquals(LocalDateTime.of(2020, 1, 1, 0, 0, 0), dto.getStartDate());
+        assertEquals(LocalDateTime.of(2023, 1, 1, 0, 0, 0), dto.getEndDate());
+        assertEquals("TBD", dto.getReportingManager());
+        assertEquals(Map.of("key1", "value1"), dto.getExtensionsData());
+    }
+
+    @Test
+    void doBackward_withTBDReportingManager_convertsToNull() {
+        EmploymentInfoDto dto = EmploymentInfoDto.builder()
+                .jobTitle("Tester")
+                .organizationUnit("QA")
+                .startDate(LocalDate.of(2019, 6, 1).atStartOfDay())
+                .endDate(LocalDate.of(2022, 6, 1).atStartOfDay())
+                .reportingManager("TBD")
+                .extensionsData(Map.of("extra", "data"))
+                .build();
+
+        EmploymentInfo external = converter.doBackward(dto);
+
+        assertNotNull(external);
+        assertEquals("Tester", external.getJobTitle());
+        assertEquals("QA", external.getOrganizationUnit());
+        assertEquals(LocalDate.of(2019, 6, 1).atStartOfDay(), external.getStartDate());
+        assertEquals(LocalDate.of(2022, 6, 1).atStartOfDay(), external.getEndDate());
+        assertNull(external.getReportingManager());
+        assertEquals(Map.of("extra", "data"), external.getExtensionsData());
+    }
+
+    @Test
+    void doBackward_withNormalReportingManager_preservesValue() {
+        EmploymentInfoDto dto = EmploymentInfoDto.builder()
+                .jobTitle("Tester")
+                .organizationUnit("QA")
+                .startDate(LocalDate.of(2019, 6, 1).atStartOfDay())
+                .endDate(LocalDate.of(2022, 6, 1).atStartOfDay())
+                .reportingManager("Actual Manager")
+                .extensionsData(Map.of("extra", "data"))
+                .build();
+
+        EmploymentInfo external = converter.doBackward(dto);
+
+        assertNotNull(external);
+        assertEquals("Tester", external.getJobTitle());
+        assertEquals("QA", external.getOrganizationUnit());
+        assertEquals(LocalDate.of(2019, 6, 1).atStartOfDay(), external.getStartDate());
+        assertEquals(LocalDate.of(2022, 6, 1).atStartOfDay(), external.getEndDate());
+        assertEquals("Actual Manager", external.getReportingManager());
+        assertEquals(Map.of("extra", "data"), external.getExtensionsData());
+    }
 }
