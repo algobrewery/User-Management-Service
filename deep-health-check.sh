@@ -120,7 +120,7 @@ CREATE_PAYLOAD=$(cat <<EOF
   "lastName": "User",
   "phoneInfo": {
     "number": "$PHONE_NUMBER",
-    "countryCode": "91",
+    "countryCode": 91,
     "verificationStatus": "verified"
   },
   "emailInfo": {
@@ -133,7 +133,6 @@ CREATE_PAYLOAD=$(cat <<EOF
       "endDate": "2022-11-12T00:00:00",
       "jobTitle": "Health Check Engineer",
       "organizationUnit": "QA",
-      "reportingManager": "Health Check Manager",
       "extensionsData": {
         "employmentType": "FULL_TIME",
         "primaryLocation": "Remote"
