@@ -126,15 +126,61 @@ jobs:
         run: |
           echo "Creating ECS infrastructure for test environment..."
 
-          # Create ECS cluster if it doesn't exist
-          aws ecs describe-clusters --clusters user-management-cluster-test || \
-          aws ecs create-cluster --cluster-name user-management-cluster-test
+          # Create IAM roles first
+          echo "Creating IAM roles..."
+          aws iam create-role --role-name ecsTaskExecutionRole --assume-role-policy-document '{
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "ecs-tasks.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }' 2>/dev/null || echo "ecsTaskExecutionRole already exists"
+
+          aws iam attach-role-policy --role-name ecsTaskExecutionRole --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy 2>/dev/null || true
+
+          aws iam create-role --role-name ecsTaskRole --assume-role-policy-document '{
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "ecs-tasks.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }' 2>/dev/null || echo "ecsTaskRole already exists"
+
+          aws iam attach-role-policy --role-name ecsTaskRole --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly 2>/dev/null || true
+          aws iam attach-role-policy --role-name ecsTaskRole --policy-arn arn:aws:iam::aws:policy/CloudWatchLogsFullAccess 2>/dev/null || true
+
+          # Create ECS cluster with explicit check
+          echo "Creating ECS cluster..."
+          if aws ecs describe-clusters --clusters user-management-cluster-test --query 'clusters[0].clusterName' --output text 2>/dev/null | grep -q "user-management-cluster-test"; then
+            echo "Cluster user-management-cluster-test already exists"
+          else
+            echo "Creating new cluster user-management-cluster-test"
+            aws ecs create-cluster --cluster-name user-management-cluster-test
+            echo "Waiting for cluster to be active..."
+            sleep 10
+          fi
+
+          # Verify cluster exists
+          aws ecs describe-clusters --clusters user-management-cluster-test --query 'clusters[0].[clusterName,status]' --output table
 
           # Create CloudWatch log group if it doesn't exist
-          aws logs create-log-group --log-group-name "/ecs/user-management-service-test" || true
+          echo "Creating CloudWatch log group..."
+          aws logs create-log-group --log-group-name "/ecs/user-management-service-test" 2>/dev/null || echo "Log group already exists"
 
           # Get default VPC and create security group if needed
+          echo "Setting up networking..."
           VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" --query 'Vpcs[0].VpcId' --output text)
+          echo "Using VPC: $VPC_ID"
 
           # Check if security group exists, create if not
           SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=user-management-sg-test" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || echo "None")
@@ -153,9 +199,16 @@ jobs:
               --protocol tcp \
               --port 8080 \
               --cidr 0.0.0.0/0
+
+            echo "Created security group: $SG_ID"
+          else
+            echo "Security group already exists: $SG_ID"
           fi
 
-          echo "Test infrastructure ready!"
+          echo "✅ Test infrastructure ready!"
+          echo "Cluster: user-management-cluster-test"
+          echo "Security Group: $SG_ID"
+          echo "VPC: $VPC_ID"
 
       - name: Update task definition for test
         env:
@@ -169,13 +222,60 @@ jobs:
           sed -i "s/<YOUR-REGION>/${{ env.AWS_REGION }}/g" task-definition-test.json
           sed -i "s/<IMAGE_TAG>/$IMAGE_TAG/g" task-definition-test.json
 
-      - name: Deploy to Test ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: task-definition-test.json
-          service: user-management-service-test
-          cluster: user-management-cluster-test
-          wait-for-service-stability: true
+      - name: Verify cluster before deployment
+        run: |
+          echo "Verifying cluster exists before deployment..."
+          aws ecs describe-clusters --clusters user-management-cluster-test --query 'clusters[0].[clusterName,status]' --output table
+
+          # Double check cluster exists
+          CLUSTER_STATUS=$(aws ecs describe-clusters --clusters user-management-cluster-test --query 'clusters[0].status' --output text 2>/dev/null || echo "MISSING")
+          if [ "$CLUSTER_STATUS" != "ACTIVE" ]; then
+            echo "ERROR: Cluster is not active. Status: $CLUSTER_STATUS"
+            echo "Creating cluster again..."
+            aws ecs create-cluster --cluster-name user-management-cluster-test
+            sleep 15
+          fi
+
+          echo "Cluster verification complete"
+
+      - name: Register task definition and create/update service
+        run: |
+          echo "Registering task definition..."
+          TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition-test.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "Task definition registered: $TASK_DEF_ARN"
+
+          # Check if service exists
+          if aws ecs describe-services --cluster user-management-cluster-test --services user-management-service-test --query 'services[0].serviceName' --output text 2>/dev/null | grep -q "user-management-service-test"; then
+            echo "Service exists, updating..."
+            aws ecs update-service \
+              --cluster user-management-cluster-test \
+              --service user-management-service-test \
+              --task-definition $TASK_DEF_ARN
+          else
+            echo "Service doesn't exist, creating..."
+
+            # Get VPC and subnet info
+            VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" --query 'Vpcs[0].VpcId' --output text)
+            SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query 'Subnets[*].SubnetId' --output text | tr '\t' ',')
+            SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=user-management-sg-test" --query 'SecurityGroups[0].GroupId' --output text)
+
+            echo "Using VPC: $VPC_ID"
+            echo "Using Subnets: $SUBNET_IDS"
+            echo "Using Security Group: $SG_ID"
+
+            # Create the service
+            aws ecs create-service \
+              --cluster user-management-cluster-test \
+              --service-name user-management-service-test \
+              --task-definition $TASK_DEF_ARN \
+              --desired-count 1 \
+              --launch-type FARGATE \
+              --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],securityGroups=[$SG_ID],assignPublicIp=ENABLED}"
+          fi
+
+          echo "Waiting for service to be stable..."
+          aws ecs wait services-stable --cluster user-management-cluster-test --services user-management-service-test
+          echo "Service deployment complete!"
 
       - name: Get Test Environment URL
         id: get-test-url
@@ -332,13 +432,44 @@ jobs:
           sed -i "s/<YOUR-REGION>/${{ env.AWS_REGION }}/g" task-definition.json
           sed -i "s/<IMAGE_TAG>/$IMAGE_TAG/g" task-definition.json
 
-      - name: Deploy to Production ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: task-definition.json
-          service: user-management-service-prod
-          cluster: user-management-cluster-prod
-          wait-for-service-stability: true
+      - name: Register task definition and create/update production service
+        run: |
+          echo "Registering production task definition..."
+          TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "Task definition registered: $TASK_DEF_ARN"
+
+          # Check if service exists
+          if aws ecs describe-services --cluster user-management-cluster-prod --services user-management-service-prod --query 'services[0].serviceName' --output text 2>/dev/null | grep -q "user-management-service-prod"; then
+            echo "Service exists, updating..."
+            aws ecs update-service \
+              --cluster user-management-cluster-prod \
+              --service user-management-service-prod \
+              --task-definition $TASK_DEF_ARN
+          else
+            echo "Service doesn't exist, creating..."
+
+            # Get VPC and subnet info
+            VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" --query 'Vpcs[0].VpcId' --output text)
+            SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query 'Subnets[*].SubnetId' --output text | tr '\t' ',')
+            SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=user-management-sg-prod" --query 'SecurityGroups[0].GroupId' --output text)
+
+            echo "Using VPC: $VPC_ID"
+            echo "Using Subnets: $SUBNET_IDS"
+            echo "Using Security Group: $SG_ID"
+
+            # Create the service
+            aws ecs create-service \
+              --cluster user-management-cluster-prod \
+              --service-name user-management-service-prod \
+              --task-definition $TASK_DEF_ARN \
+              --desired-count 1 \
+              --launch-type FARGATE \
+              --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],securityGroups=[$SG_ID],assignPublicIp=ENABLED}"
+          fi
+
+          echo "Waiting for production service to be stable..."
+          aws ecs wait services-stable --cluster user-management-cluster-prod --services user-management-service-prod
+          echo "Production service deployment complete!"
 
       - name: Get Production Environment URL
         run: |
