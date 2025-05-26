@@ -2,8 +2,5 @@
 target/
 .gradle/
 build/
-gradle/
-gradlew
-gradlew.bat
 cloudshell-deploy.sh
 local-build-upload-deploy.sh
