@@ -122,6 +122,41 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Create ECS infrastructure for test
+        run: |
+          echo "Creating ECS infrastructure for test environment..."
+
+          # Create ECS cluster if it doesn't exist
+          aws ecs describe-clusters --clusters user-management-cluster-test || \
+          aws ecs create-cluster --cluster-name user-management-cluster-test
+
+          # Create CloudWatch log group if it doesn't exist
+          aws logs create-log-group --log-group-name "/ecs/user-management-service-test" || true
+
+          # Get default VPC and create security group if needed
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" --query 'Vpcs[0].VpcId' --output text)
+
+          # Check if security group exists, create if not
+          SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=user-management-sg-test" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || echo "None")
+
+          if [ "$SG_ID" = "None" ]; then
+            echo "Creating security group..."
+            SG_ID=$(aws ec2 create-security-group \
+              --group-name user-management-sg-test \
+              --description "Security group for User Management Service - Test Environment" \
+              --vpc-id $VPC_ID \
+              --query 'GroupId' --output text)
+
+            # Add inbound rule for port 8080
+            aws ec2 authorize-security-group-ingress \
+              --group-id $SG_ID \
+              --protocol tcp \
+              --port 8080 \
+              --cidr 0.0.0.0/0
+          fi
+
+          echo "Test infrastructure ready!"
+
       - name: Update task definition for test
         env:
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
@@ -249,6 +284,41 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create ECS infrastructure for production
+        run: |
+          echo "Creating ECS infrastructure for production environment..."
+
+          # Create ECS cluster if it doesn't exist
+          aws ecs describe-clusters --clusters user-management-cluster-prod || \
+          aws ecs create-cluster --cluster-name user-management-cluster-prod
+
+          # Create CloudWatch log group if it doesn't exist
+          aws logs create-log-group --log-group-name "/ecs/user-management-service-prod" || true
+
+          # Get default VPC and create security group if needed
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" --query 'Vpcs[0].VpcId' --output text)
+
+          # Check if security group exists, create if not
+          SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=user-management-sg-prod" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || echo "None")
+
+          if [ "$SG_ID" = "None" ]; then
+            echo "Creating security group..."
+            SG_ID=$(aws ec2 create-security-group \
+              --group-name user-management-sg-prod \
+              --description "Security group for User Management Service - Production Environment" \
+              --vpc-id $VPC_ID \
+              --query 'GroupId' --output text)
+
+            # Add inbound rule for port 8080
+            aws ec2 authorize-security-group-ingress \
+              --group-id $SG_ID \
+              --protocol tcp \
+              --port 8080 \
+              --cidr 0.0.0.0/0
+          fi
+
+          echo "Production infrastructure ready!"
 
       - name: Update task definition for production
         env:
