@@ -23,11 +23,11 @@ http_request() {
     local url=$2
     local payload=$3
     local expected_status=${4:-200}
-    
+
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
-    
+
     echo "🔍 Testing: $method $url"
-    
+
     if [ -n "$payload" ]; then
         response=$(curl -s -w "\n%{http_code}" -m $TIMEOUT -X $method "$url" \
            -H "Content-Type: application/json" \
@@ -46,26 +46,26 @@ http_request() {
            -H "x-app-region-id: us-east-1" \
            -H "x-app-trace-id: trace-$(date +%s)")
     fi
-    
+
     # Extract HTTP status code (last line)
     http_code=$(echo "$response" | tail -n1)
     # Extract response body (all lines except last)
     response_body=$(echo "$response" | head -n -1)
-    
+
     echo "Response Code: $http_code"
     echo "Response Body: $response_body"
-    
+
     if [ "$http_code" -eq "$expected_status" ]; then
         echo "✅ Test PASSED"
         PASSED_TESTS=$((PASSED_TESTS + 1))
-        
+
         # Extract user ID if this is a create request
         if [ "$method" = "POST" ] && [ "$http_code" -eq "201" ]; then
             USER_ID=$(echo "$response_body" | grep -o '"userId":"[^"]*"' | cut -d'"' -f4)
             echo "Created User ID: $USER_ID"
             echo "$USER_ID" > /tmp/integration_test_user_id.txt
         fi
-        
+
         return 0
     else
         echo "❌ Test FAILED - Expected: $expected_status, Got: $http_code"
@@ -115,7 +115,6 @@ CREATE_PAYLOAD=$(cat <<EOF
       "endDate": "2024-12-31T00:00:00",
       "jobTitle": "Integration Test Engineer",
       "organizationUnit": "QA",
-      "reportingManager": "790b5bc8-820d-4a68-a12d-550cfaca14d5",
       "extensionsData": {
         "employmentType": "FULL_TIME",
         "primaryLocation": "Remote"

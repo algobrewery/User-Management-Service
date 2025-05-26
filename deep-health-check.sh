@@ -131,12 +131,11 @@ CREATE_PAYLOAD=$(cat <<EOF
     {
       "startDate": "2022-02-12T00:00:00",
       "endDate": "2022-11-12T00:00:00",
-      "jobTitle": "Devops intern",
-      "organizationUnit": "Technology",
-      "reportingManager": "790b5bc8-820d-4a68-a12d-550cfaca14d5",
+      "jobTitle": "Health Check Engineer",
+      "organizationUnit": "QA",
       "extensionsData": {
-        "employmentType": "INTERN",
-        "primaryLocation": "Bangalore"
+        "employmentType": "FULL_TIME",
+        "primaryLocation": "Remote"
       }
     }
   ]
