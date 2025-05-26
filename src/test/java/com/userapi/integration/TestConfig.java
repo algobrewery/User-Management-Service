@@ -8,6 +8,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+/**
+ * Integration test configuration for PostgreSQL-based tests.
+ * Uses the same PostgreSQL database as production with proper test isolation.
+ */
 @TestConfiguration
 @ActiveProfiles("test")
 @TestPropertySource(locations = "classpath:application-test.properties")
@@ -19,4 +23,4 @@ public class TestConfig {
                 .webAppContextSetup(webApplicationContext)
                 .build();
     }
-} 
+}

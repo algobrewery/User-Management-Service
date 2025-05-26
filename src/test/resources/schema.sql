@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     start_date TIMESTAMP NOT NULL,
     end_date TIMESTAMP,
     status VARCHAR(255) NOT NULL,
-    job_profile_uuids VARCHAR(1000),
+    job_profile_uuids TEXT[],
     PRIMARY KEY (user_uuid),
     CONSTRAINT UK_user_profiles_email UNIQUE (email),
     CONSTRAINT UK_user_profiles_username UNIQUE (username)
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS job_profiles (
     end_date TIMESTAMP,
     reporting_manager VARCHAR(255),
     organization_unit VARCHAR(255),
-    extensions_data JSON,
+    extensions_data JSONB,
     PRIMARY KEY (job_profile_uuid)
 );
 
