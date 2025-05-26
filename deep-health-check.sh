@@ -133,6 +133,7 @@ CREATE_PAYLOAD=$(cat <<EOF
       "endDate": "2022-11-12T00:00:00",
       "jobTitle": "Health Check Engineer",
       "organizationUnit": "QA",
+      "reportingManager": "Health Check Manager",
       "extensionsData": {
         "employmentType": "FULL_TIME",
         "primaryLocation": "Remote"
