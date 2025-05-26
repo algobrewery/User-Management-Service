@@ -1,5 +1,5 @@
 {
-    "family": "user-management-service-prod",
+    "family": "user-management-service-test",
     "networkMode": "awsvpc",
     "requiresCompatibilities": [
         "FARGATE"
@@ -23,7 +23,7 @@
             "environment": [
                 {
                     "name": "SPRING_PROFILES_ACTIVE",
-                    "value": "prod"
+                    "value": "test"
                 },
                 {
                     "name": "SPRING_DATASOURCE_URL",
@@ -41,7 +41,7 @@
             "logConfiguration": {
                 "logDriver": "awslogs",
                 "options": {
-                    "awslogs-group": "/ecs/user-management-service-prod",
+                    "awslogs-group": "/ecs/user-management-service-test",
                     "awslogs-region": "<YOUR-REGION>",
                     "awslogs-stream-prefix": "ecs"
                 }
