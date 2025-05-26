@@ -19,7 +19,7 @@ public class EmploymentInfoConverter implements BiDirectionalConverter<Employmen
                 .organizationUnit(external.getOrganizationUnit())
                 .startDate(external.getStartDate())
                 .endDate(external.getEndDate())
-                .reportingManager(external.getReportingManager() != null ? external.getReportingManager() : "TBD")
+                .reportingManager(external.getReportingManager())
                 .extensionsData(external.getExtensionsData())
                 .build();
     }
@@ -34,7 +34,7 @@ public class EmploymentInfoConverter implements BiDirectionalConverter<Employmen
         external.setOrganizationUnit(internal.getOrganizationUnit());
         external.setStartDate(internal.getStartDate());
         external.setEndDate(internal.getEndDate());
-        external.setReportingManager("TBD".equals(internal.getReportingManager()) ? null : internal.getReportingManager());
+        external.setReportingManager(internal.getReportingManager());
         external.setExtensionsData(internal.getExtensionsData());
         return external;
     }
