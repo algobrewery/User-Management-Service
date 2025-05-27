@@ -275,7 +275,7 @@ jobs:
           fi
 
           echo "Waiting for service to be stable..."
-          aws ecs wait services-stable --cluster user-management-cluster-test --services user-management-service-test
+          aws ecs wait services-stable --cluster user-management-cluster-test --services user-management-service-test --cli-read-timeout 1200 --cli-connect-timeout 60
           echo "Service deployment complete!"
 
       - name: Get Test Environment URL
@@ -470,7 +470,7 @@ jobs:
           fi
 
           echo "Waiting for production service to be stable..."
-          aws ecs wait services-stable --cluster user-management-cluster-prod --services user-management-service-prod
+          aws ecs wait services-stable --cluster user-management-cluster-prod --services user-management-service-prod --cli-read-timeout 1200 --cli-connect-timeout 60
           echo "Production service deployment complete!"
 
       - name: Get Production Environment URL

@@ -53,9 +53,9 @@
           "curl -f http://localhost:8080/actuator/health || exit 1"
         ],
         "interval": 30,
-        "timeout": 5,
-        "retries": 3,
-        "startPeriod": 60
+        "timeout": 10,
+        "retries": 5,
+        "startPeriod": 120
       }
     }
   ]
