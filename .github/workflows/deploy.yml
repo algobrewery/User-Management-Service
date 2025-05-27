@@ -275,8 +275,28 @@ jobs:
           fi
 
           echo "Waiting for service to be stable..."
-          aws ecs wait services-stable --cluster user-management-cluster-test --services user-management-service-test --cli-read-timeout 1200 --cli-connect-timeout 60
-          echo "Service deployment complete!"
+
+          # Wait for deployment to complete with custom logic
+          for i in {1..30}; do
+            DEPLOYMENT_STATUS=$(aws ecs describe-services --cluster user-management-cluster-test --services user-management-service-test --query 'services[0].deployments[0].rolloutState' --output text)
+            RUNNING_COUNT=$(aws ecs describe-services --cluster user-management-cluster-test --services user-management-service-test --query 'services[0].runningCount' --output text)
+            DESIRED_COUNT=$(aws ecs describe-services --cluster user-management-cluster-test --services user-management-service-test --query 'services[0].desiredCount' --output text)
+
+            echo "Deployment status: $DEPLOYMENT_STATUS, Running: $RUNNING_COUNT, Desired: $DESIRED_COUNT"
+
+            if [ "$DEPLOYMENT_STATUS" = "COMPLETED" ] && [ "$RUNNING_COUNT" = "$DESIRED_COUNT" ]; then
+              echo "✅ Service deployment completed successfully!"
+              break
+            fi
+
+            if [ $i -eq 30 ]; then
+              echo "❌ Deployment timeout after 15 minutes"
+              exit 1
+            fi
+
+            echo "Waiting... (attempt $i/30)"
+            sleep 30
+          done
 
       - name: Get Test Environment URL
         id: get-test-url
@@ -309,20 +329,43 @@ jobs:
       - name: Wait for service to be ready
         run: |
           echo "Waiting for test service to be fully ready..."
-          sleep 60
+          sleep 90
+
+      - name: Verify service health before deep check
+        env:
+          TEST_URL: ${{ needs.deploy-test.outputs.test-url }}
+        run: |
+          echo "Verifying basic health endpoint..."
+          for i in {1..10}; do
+            if curl -f -s "$TEST_URL/actuator/health"; then
+              echo "✅ Health endpoint is responding"
+              break
+            fi
+            echo "Waiting for health endpoint... (attempt $i/10)"
+            sleep 15
+          done
 
       - name: Run Deep Health Check
         env:
           TEST_URL: ${{ needs.deploy-test.outputs.test-url }}
         run: |
+          echo "🏥 Running comprehensive deep health check..."
+          echo "Test URL: $TEST_URL"
+
           # Update the health check script with the test URL
           sed -i "s|API_BASE_URL=\".*\"|API_BASE_URL=\"$TEST_URL/user\"|g" deep-health-check.sh
 
           # Make script executable and run it
           chmod +x deep-health-check.sh
-          ./deep-health-check.sh
 
-          echo "✅ Deep health check passed on test environment"
+          # Run with detailed output
+          if ./deep-health-check.sh; then
+            echo "✅ Deep health check passed on test environment"
+          else
+            echo "❌ Deep health check failed on test environment"
+            echo "Checking application logs..."
+            exit 1
+          fi
 
   # Job 5: Run Integration Tests
   integration-tests:
@@ -470,8 +513,28 @@ jobs:
           fi
 
           echo "Waiting for production service to be stable..."
-          aws ecs wait services-stable --cluster user-management-cluster-prod --services user-management-service-prod --cli-read-timeout 1200 --cli-connect-timeout 60
-          echo "Production service deployment complete!"
+
+          # Wait for production deployment to complete with custom logic
+          for i in {1..30}; do
+            DEPLOYMENT_STATUS=$(aws ecs describe-services --cluster user-management-cluster-prod --services user-management-service-prod --query 'services[0].deployments[0].rolloutState' --output text)
+            RUNNING_COUNT=$(aws ecs describe-services --cluster user-management-cluster-prod --services user-management-service-prod --query 'services[0].runningCount' --output text)
+            DESIRED_COUNT=$(aws ecs describe-services --cluster user-management-cluster-prod --services user-management-service-prod --query 'services[0].desiredCount' --output text)
+
+            echo "Production deployment status: $DEPLOYMENT_STATUS, Running: $RUNNING_COUNT, Desired: $DESIRED_COUNT"
+
+            if [ "$DEPLOYMENT_STATUS" = "COMPLETED" ] && [ "$RUNNING_COUNT" = "$DESIRED_COUNT" ]; then
+              echo "✅ Production service deployment completed successfully!"
+              break
+            fi
+
+            if [ $i -eq 30 ]; then
+              echo "❌ Production deployment timeout after 15 minutes"
+              exit 1
+            fi
+
+            echo "Waiting... (attempt $i/30)"
+            sleep 30
+          done
 
       - name: Get Production Environment URL
         run: |
@@ -498,10 +561,10 @@ jobs:
             exit 1
           fi
 
-      - name: Run Production Health Check
+      - name: Run Production Deep Health Check
         run: |
-          echo "Running basic health check on production..."
-          sleep 30
+          echo "🏥 Running comprehensive production health check..."
+          sleep 60
 
           # Get production URL again
           TASK_ARN=$(aws ecs list-tasks --cluster user-management-cluster-prod --service-name user-management-service-prod --query 'taskArns[0]' --output text)
@@ -509,9 +572,27 @@ jobs:
           PUBLIC_IP=$(aws ec2 describe-network-interfaces --network-interface-ids $ENI_ID --query 'NetworkInterfaces[0].Association.PublicIp' --output text)
           PROD_URL="http://$PUBLIC_IP:8080"
 
-          # Simple health check
-          if curl -f -s "$PROD_URL/actuator/health" || curl -f -s "$PROD_URL/health"; then
-            echo "✅ Production health check passed"
+          echo "Production URL: $PROD_URL"
+
+          # Wait for health endpoint to be ready
+          echo "Verifying production health endpoint..."
+          for i in {1..10}; do
+            if curl -f -s "$PROD_URL/actuator/health"; then
+              echo "✅ Production health endpoint is responding"
+              break
+            fi
+            echo "Waiting for production health endpoint... (attempt $i/10)"
+            sleep 15
+          done
+
+          # Run deep health check on production
+          echo "Running deep health check on production..."
+          sed -i "s|API_BASE_URL=\".*\"|API_BASE_URL=\"$PROD_URL/user\"|g" deep-health-check.sh
+          chmod +x deep-health-check.sh
+
+          if ./deep-health-check.sh; then
+            echo "✅ Production deep health check passed"
           else
-            echo "⚠️ Production health check endpoint not available, but deployment completed"
+            echo "⚠️ Production deep health check failed, but deployment completed"
+            echo "Manual verification may be required"
           fi
