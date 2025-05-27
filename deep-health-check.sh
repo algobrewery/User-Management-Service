@@ -3,14 +3,19 @@
 set -e
 set -x
 
-API_BASE_URL="http://18.232.156.209:8080/user"
+API_BASE_URL="http://3.92.239.36:8080/user"
 TIMEOUT=5
 
 TIMESTAMP=$(date +%s)
+MANAGER_USERNAME="manageruser_$TIMESTAMP"
+MANAGER_PHONE="99999${TIMESTAMP: -5}"
+MANAGER_EMAIL="manager_${TIMESTAMP}@algobrewery.com"
+
 USERNAME="testuser_$TIMESTAMP"
-PHONE_NUMBER="808080${TIMESTAMP: -6}"
+PHONE_NUMBER="80808${TIMESTAMP: -5}"
 EMAIL="testuser_${TIMESTAMP}@algobrewery.com"
 
+# Function to send HTTP requests
 http_request() {
   local method=$1
   local url=$2
@@ -63,55 +68,55 @@ http_request() {
   echo "Response Status: $status_code"
   echo "Response Body: $response"
 
-  # Special handling for POST request with 500 status but successful creation
-  if [ "$method" = "POST" ] && [ "$status_code" -eq 500 ]; then
-    if echo "$response" | grep -q '"message":"User created successfully"'; then
-      echo "✅ User created successfully despite 500 status"
-      # Extract userId from the nested response
-      userId=$(echo "$response" | sed -n 's/.*"result":{[^}]*"userId":"\([^"]*\)".*/\1/p')
-      if [ -n "$userId" ]; then
-        echo "$userId" > /tmp/userId.txt
-        return 0
-      fi
-    fi
-  fi
-
-  # Special handling for PUT request with 500 status but successful update
-  if [ "$method" = "PUT" ] && [ "$status_code" -eq 500 ]; then
-    if echo "$response" | grep -q '"message":"Updated user successfully"'; then
-      echo "✅ User updated successfully despite 500 status"
-      return 0
-    fi
-  fi
-
-  # For all other cases, treat 400+ as error
-  if [ "$status_code" -ge 400 ]; then
-    echo "❌ Request failed with status $status_code"
-    exit 1
-  fi
-
   if [ "$method" = "POST" ]; then
-    # Try to extract userId from result.result.userId (double-nested)
-    userId=$(echo "$response" | sed -n 's/.*"result":{[^}]*"result":{[^}]*"userId":"\([^"]*\)".*/\1/p')
-    # If not found, try result.userId (single-nested)
-    if [ -z "$userId" ]; then
-      userId=$(echo "$response" | sed -n 's/.*"result":{[^}]*"userId":"\([^"]*\)".*/\1/p')
-    fi
-    # If not found, try top-level userId
-    if [ -z "$userId" ]; then
-      userId=$(echo "$response" | sed -n 's/.*"userId":"\([^"]*\)".*/\1/p')
-    fi
+    userId=$(echo "$response" | grep -o '"userId":"[^"]*"' | head -1 | sed 's/"userId":"\([^"]*\)"/\1/')
     if [ -z "$userId" ]; then
       echo "❌ Failed to extract userId from response"
       exit 1
     fi
-    echo "$userId" > /tmp/userId.txt
+    echo "$userId"
+  else
+    echo "$response"
   fi
-
-  echo "$response"
 }
 
-echo "=== Creating Test User ==="
+echo "=== Creating Manager User (reporting manager) ==="
+MANAGER_PAYLOAD=$(cat <<EOF
+{
+  "username": "$MANAGER_USERNAME",
+  "firstName": "Manager",
+  "middleName": "Healthcheck",
+  "lastName": "User",
+  "phoneInfo": {
+    "number": "$MANAGER_PHONE",
+    "countryCode": 91,
+    "verificationStatus": "verified"
+  },
+  "emailInfo": {
+    "email": "$MANAGER_EMAIL",
+    "verificationStatus": "verified"
+  },
+  "employmentInfoList": [
+    {
+      "startDate": "2022-01-01T00:00:00",
+      "endDate": "2023-01-01T00:00:00",
+      "jobTitle": "Manager",
+      "organizationUnit": "QA",
+      "reportingManager": "",
+      "extensionsData": {
+        "employmentType": "FULL_TIME",
+        "primaryLocation": "Remote"
+      }
+    }
+  ]
+}
+EOF
+)
+
+MANAGER_ID=$(http_request "POST" "$API_BASE_URL" "$MANAGER_PAYLOAD")
+echo "✅ Created manager user with ID: $MANAGER_ID"
+
+echo "=== Creating Test User (with reportingManager as the manager above) ==="
 CREATE_PAYLOAD=$(cat <<EOF
 {
   "username": "$USERNAME",
@@ -133,7 +138,7 @@ CREATE_PAYLOAD=$(cat <<EOF
       "endDate": "2022-11-12T00:00:00",
       "jobTitle": "Health Check Engineer",
       "organizationUnit": "QA",
-      "reportingManager": "790b5bc8-820d-4a68-a12d-550cfaca14d5",
+      "reportingManager": "$MANAGER_ID",
       "extensionsData": {
         "employmentType": "FULL_TIME",
         "primaryLocation": "Remote"
@@ -144,19 +149,14 @@ CREATE_PAYLOAD=$(cat <<EOF
 EOF
 )
 
-CREATE_RESPONSE=$(http_request "POST" "$API_BASE_URL" "$CREATE_PAYLOAD")
-TEST_USER_ID=$(cat /tmp/userId.txt)
+TEST_USER_ID=$(http_request "POST" "$API_BASE_URL" "$CREATE_PAYLOAD")
+echo "✅ Created test user with ID: $TEST_USER_ID"
 
-echo "✅ Created user with ID: $TEST_USER_ID"
-echo "Username: $USERNAME"
-echo "Phone: $PHONE_NUMBER"
-echo "Email: $EMAIL"
-
-echo "=== Getting User ==="
+echo "=== Getting Test User ==="
 GET_URL="$API_BASE_URL/$TEST_USER_ID"
 http_request "GET" "$GET_URL" ""
 
-echo "=== Updating User ==="
+echo "=== Updating Test User ==="
 UPDATE_PAYLOAD='{
   "firstName": "Updated",
   "lastName": "User"
@@ -164,11 +164,11 @@ UPDATE_PAYLOAD='{
 UPDATE_URL="$API_BASE_URL/$TEST_USER_ID"
 http_request "PUT" "$UPDATE_URL" "$UPDATE_PAYLOAD"
 
-echo "=== Deleting User ==="
+echo "=== Deleting Test User ==="
 DELETE_URL="$API_BASE_URL/$TEST_USER_ID"
 http_request "DELETE" "$DELETE_URL" ""
 
-echo "=== Verifying User Deletion ==="
+echo "=== Verifying Test User Deletion ==="
 GET_URL="$API_BASE_URL/$TEST_USER_ID"
 DELETE_RESPONSE=$(curl -s -m $TIMEOUT -X DELETE "$GET_URL" \
    -H "Content-Type: application/json" \
@@ -186,8 +186,6 @@ else
   echo "Actual response: $DELETE_RESPONSE"
   exit 1
 fi
-
-rm -f /tmp/userId.txt
 
 echo "================================="
 echo "✅ All deep health checks passed!"
