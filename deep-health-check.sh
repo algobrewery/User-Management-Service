@@ -3,7 +3,7 @@
 set -e
 set -x
 
-API_BASE_URL="http://3.92.239.36:8080/user"
+API_BASE_URL="http://3.86.190.90:8080/user"
 TIMEOUT=5
 
 TIMESTAMP=$(date +%s)
@@ -23,12 +23,12 @@ http_request() {
   local response
   local userId=""
 
-  echo "Sending $method request to $url"
-  [ -n "$data" ] && echo "Payload: $data"
+  >&2 echo "Sending $method request to $url"
+  [ -n "$data" ] && >&2 echo "Payload: $data"
 
   # First check if server is reachable
   if ! curl -s -m $TIMEOUT -o /dev/null "$API_BASE_URL"; then
-    echo "❌ Cannot connect to server at $API_BASE_URL"
+    >&2 echo "❌ Cannot connect to server at $API_BASE_URL"
     exit 1
   fi
 
@@ -50,11 +50,11 @@ http_request() {
   local curl_exit_code=$?
 
   if [ $curl_exit_code -eq 28 ]; then
-    echo "❌ Request timed out after ${TIMEOUT} seconds"
+    >&2 echo "❌ Request timed out after ${TIMEOUT} seconds"
     exit 1
   elif [ $curl_exit_code -ne 0 ]; then
-    echo "❌ Curl command failed with exit code $curl_exit_code"
-    echo "Response: $response"
+    >&2 echo "❌ Curl command failed with exit code $curl_exit_code"
+    >&2 echo "Response: $response"
     exit 1
   fi
 
@@ -65,19 +65,20 @@ http_request() {
     -H "x-app-trace-id: trace-$TIMESTAMP" \
     -H "x-app-region-id: us-east-1")
 
-  echo "Response Status: $status_code"
-  echo "Response Body: $response"
+  >&2 echo "Response Status: $status_code"
+  >&2 echo "Response Body: $response"
 
   if [ "$method" = "POST" ]; then
     userId=$(echo "$response" | grep -o '"userId":"[^"]*"' | head -1 | sed 's/"userId":"\([^"]*\)"/\1/')
     if [ -z "$userId" ]; then
-      echo "❌ Failed to extract userId from response"
+      >&2 echo "❌ Failed to extract userId from response"
       exit 1
     fi
     echo "$userId"
-  else
-    echo "$response"
+    return 0
   fi
+
+  echo "$response"
 }
 
 echo "=== Creating Manager User (reporting manager) ==="
