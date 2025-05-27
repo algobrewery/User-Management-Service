@@ -1,0 +1,62 @@
+{
+  "family": "user-management-service-test",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::038462789766:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::038462789766:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "user-management-service",
+      "image": "038462789766.dkr.ecr.us-east-1.amazonaws.com/user-management-service:latest",
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "test"
+        },
+        {
+          "name": "DB_HOST_TEST",
+          "value": "task-silo-db-test-2.culss6gmw8na.us-east-1.rds.amazonaws.com"
+        },
+        {
+          "name": "DB_NAME_TEST",
+          "value": "postgres"
+        },
+        {
+          "name": "DB_USERNAME_TEST",
+          "value": "tasksilodbtest"
+        },
+        {
+          "name": "DB_PASSWORD_TEST",
+          "value": "tasksilodbtest"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/user-management-service-test",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost:8080/actuator/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}

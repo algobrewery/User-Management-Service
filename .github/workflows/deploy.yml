@@ -217,10 +217,11 @@ jobs:
           # Get AWS Account ID
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-          # Update task definition with actual values
-          sed -i "s/<YOUR-ACCOUNT-ID>/$AWS_ACCOUNT_ID/g" task-definition-test.json
-          sed -i "s/<YOUR-REGION>/${{ env.AWS_REGION }}/g" task-definition-test.json
-          sed -i "s/<IMAGE_TAG>/$IMAGE_TAG/g" task-definition-test.json
+          # Update task definition with actual values for test environment
+          sed -i "s|038462789766.dkr.ecr.us-east-1.amazonaws.com/user-management-service:latest|$AWS_ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG|g" infrastructure/task-definition-test.json
+
+          # Copy to working directory
+          cp infrastructure/task-definition-test.json task-definition-test.json
 
       - name: Verify cluster before deployment
         run: |
@@ -427,10 +428,11 @@ jobs:
           # Get AWS Account ID
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-          # Update task definition with actual values
-          sed -i "s/<YOUR-ACCOUNT-ID>/$AWS_ACCOUNT_ID/g" task-definition.json
-          sed -i "s/<YOUR-REGION>/${{ env.AWS_REGION }}/g" task-definition.json
-          sed -i "s/<IMAGE_TAG>/$IMAGE_TAG/g" task-definition.json
+          # Update task definition with actual values for production environment
+          sed -i "s|038462789766.dkr.ecr.us-east-1.amazonaws.com/user-management-service:latest|$AWS_ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG|g" infrastructure/task-definition-prod.json
+
+          # Copy to working directory
+          cp infrastructure/task-definition-prod.json task-definition.json
 
       - name: Register task definition and create/update production service
         run: |
