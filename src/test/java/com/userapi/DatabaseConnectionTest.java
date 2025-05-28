@@ -13,14 +13,14 @@ public class DatabaseConnectionTest {
         System.out.println("🔧 Testing basic configuration...");
 
         // Test environment variables
-        String testHost = System.getProperty("DB_HOST_TEST", "task-silo-db-test-2.culss6gmw8na.us-east-1.rds.amazonaws.com");
+        String testHost = System.getProperty("DB_HOST_TEST", "nucleus-staging-1.culss6gmw8na.us-east-1.rds.amazonaws.com");
         String prodHost = System.getProperty("DB_HOST_PROD", "user-management-prod-db.culss6gmw8na.us-east-1.rds.amazonaws.com");
 
         System.out.println("📊 Test Database Host: " + testHost);
         System.out.println("📊 Production Database Host: " + prodHost);
 
         // Basic validation
-        assert testHost.contains("task-silo-db-test-2") : "Test database host should contain 'task-silo-db-test-2'";
+        assert testHost.contains("nucleus-staging") : "Test database host should contain 'nucleus-staging'";
         assert prodHost.contains("user-management-prod-db") : "Production database host should contain 'user-management-prod-db'";
 
         System.out.println("✅ Basic configuration test passed!");
