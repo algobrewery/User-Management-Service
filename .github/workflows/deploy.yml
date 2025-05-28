@@ -6,10 +6,13 @@ on:
   pull_request:
     branches: [ main ]
 
-# Required permissions for OIDC
+# Required permissions for OIDC (Private Repository)
 permissions:
-  id-token: write   # Required for OIDC token
-  contents: read    # Required for actions/checkout
+  id-token: write      # Required for OIDC token
+  contents: read       # Required for actions/checkout
+  actions: read        # Required for private repository
+  security-events: write  # Required for private repository
+  packages: write      # Required for ECR push
 
 env:
   AWS_REGION: us-east-1
