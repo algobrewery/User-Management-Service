@@ -6,9 +6,16 @@ on:
   pull_request:
     branches: [ main ]
 
+# Required permissions for OIDC
+permissions:
+  id-token: write   # Required for OIDC token
+  contents: read    # Required for actions/checkout
+
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: user-management-service
+  # GitHub OIDC Role ARN
+  AWS_ROLE_ARN: arn:aws:iam::038462789766:role/GitHubActionsRole
 
 jobs:
   # Job 1: Run Unit Tests
@@ -76,12 +83,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-BuildAndPush
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
@@ -114,12 +120,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-DeployTest
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Create ECS infrastructure for test
@@ -421,12 +426,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-DeployProduction
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Create ECS infrastructure for production
