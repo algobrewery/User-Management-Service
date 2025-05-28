@@ -24,7 +24,7 @@
         },
         {
           "name": "DB_HOST_TEST",
-          "value": "nucleus-staging-1.culss6gmw8na.us-east-1.rds.amazonaws.com"
+          "value": "nucleus-staging-public.culss6gmw8na.us-east-1.rds.amazonaws.com"
         },
         {
           "name": "DB_NAME_TEST",

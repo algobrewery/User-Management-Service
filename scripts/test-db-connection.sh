@@ -4,7 +4,7 @@
 echo "🔍 Testing Database Connections..."
 
 # Test Database Details
-TEST_HOST="nucleus-staging-1.culss6gmw8na.us-east-1.rds.amazonaws.com"
+TEST_HOST="nucleus-staging-public.culss6gmw8na.us-east-1.rds.amazonaws.com"
 TEST_USER="nucleus_staging"
 TEST_PASS="nucleus_staging"
 TEST_DB="nucleus_staging_db"

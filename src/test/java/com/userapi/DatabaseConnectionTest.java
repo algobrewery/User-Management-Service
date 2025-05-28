@@ -13,7 +13,7 @@ public class DatabaseConnectionTest {
         System.out.println("🔧 Testing basic configuration...");
 
         // Test environment variables
-        String testHost = System.getProperty("DB_HOST_TEST", "nucleus-staging-1.culss6gmw8na.us-east-1.rds.amazonaws.com");
+        String testHost = System.getProperty("DB_HOST_TEST", "nucleus-staging-public.culss6gmw8na.us-east-1.rds.amazonaws.com");
         String prodHost = System.getProperty("DB_HOST_PROD", "user-management-prod-db.culss6gmw8na.us-east-1.rds.amazonaws.com");
 
         System.out.println("📊 Test Database Host: " + testHost);
@@ -30,7 +30,7 @@ public class DatabaseConnectionTest {
     void testDatabaseEndpoints() {
         System.out.println("🌐 Testing database endpoint format...");
 
-        String testEndpoint = "nucleus-staging-1.culss6gmw8na.us-east-1.rds.amazonaws.com";
+        String testEndpoint = "nucleus-staging-public.culss6gmw8na.us-east-1.rds.amazonaws.com";
         String prodEndpoint = "user-management-prod-db.culss6gmw8na.us-east-1.rds.amazonaws.com";
 
         // Validate endpoint format

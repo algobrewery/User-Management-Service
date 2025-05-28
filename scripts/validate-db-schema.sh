@@ -44,7 +44,7 @@ check_schema() {
 }
 
 # Test Database
-check_schema "nucleus-staging-1.culss6gmw8na.us-east-1.rds.amazonaws.com" \
+check_schema "nucleus-staging-public.culss6gmw8na.us-east-1.rds.amazonaws.com" \
              "nucleus_staging" \
              "nucleus_staging" \
              "nucleus_staging_db" \

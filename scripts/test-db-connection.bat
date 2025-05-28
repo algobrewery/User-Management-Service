@@ -2,7 +2,7 @@
 echo 🔍 Testing Database Connections...
 
 REM Test Database Details
-set TEST_HOST=nucleus-staging-1.culss6gmw8na.us-east-1.rds.amazonaws.com
+set TEST_HOST=nucleus-staging-public.culss6gmw8na.us-east-1.rds.amazonaws.com
 set TEST_USER=nucleus_staging
 set TEST_PASS=nucleus_staging
 set TEST_DB=nucleus_staging_db
