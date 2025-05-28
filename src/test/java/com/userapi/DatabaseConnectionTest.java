@@ -30,7 +30,7 @@ public class DatabaseConnectionTest {
     void testDatabaseEndpoints() {
         System.out.println("🌐 Testing database endpoint format...");
 
-        String testEndpoint = "task-silo-db-test-2.culss6gmw8na.us-east-1.rds.amazonaws.com";
+        String testEndpoint = "nucleus-staging-1.culss6gmw8na.us-east-1.rds.amazonaws.com";
         String prodEndpoint = "user-management-prod-db.culss6gmw8na.us-east-1.rds.amazonaws.com";
 
         // Validate endpoint format

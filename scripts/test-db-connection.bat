@@ -2,10 +2,10 @@
 echo 🔍 Testing Database Connections...
 
 REM Test Database Details
-set TEST_HOST=task-silo-db-test-2.culss6gmw8na.us-east-1.rds.amazonaws.com
-set TEST_USER=tasksilodbtest
-set TEST_PASS=tasksilodbtest
-set TEST_DB=postgres
+set TEST_HOST=nucleus-staging-1.culss6gmw8na.us-east-1.rds.amazonaws.com
+set TEST_USER=nucleus_staging
+set TEST_PASS=nucleus_staging
+set TEST_DB=nucleus_staging_db
 
 REM Production Database Details
 set PROD_HOST=user-management-prod-db.culss6gmw8na.us-east-1.rds.amazonaws.com

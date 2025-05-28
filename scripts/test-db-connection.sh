@@ -4,10 +4,10 @@
 echo "🔍 Testing Database Connections..."
 
 # Test Database Details
-TEST_HOST="task-silo-db-test-2.culss6gmw8na.us-east-1.rds.amazonaws.com"
-TEST_USER="tasksilodbtest"
-TEST_PASS="tasksilodbtest"
-TEST_DB="postgres"
+TEST_HOST="nucleus-staging-1.culss6gmw8na.us-east-1.rds.amazonaws.com"
+TEST_USER="nucleus_staging"
+TEST_PASS="nucleus_staging"
+TEST_DB="nucleus_staging_db"
 
 # Production Database Details
 PROD_HOST="user-management-prod-db.culss6gmw8na.us-east-1.rds.amazonaws.com"

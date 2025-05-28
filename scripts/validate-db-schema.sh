@@ -44,10 +44,10 @@ check_schema() {
 }
 
 # Test Database
-check_schema "task-silo-db-test-2.culss6gmw8na.us-east-1.rds.amazonaws.com" \
-             "tasksilodbtest" \
-             "tasksilodbtest" \
-             "postgres" \
+check_schema "nucleus-staging-1.culss6gmw8na.us-east-1.rds.amazonaws.com" \
+             "nucleus_staging" \
+             "nucleus_staging" \
+             "nucleus_staging_db" \
              "TEST"
 
 # Production Database

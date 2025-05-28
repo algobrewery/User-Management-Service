@@ -24,19 +24,19 @@
         },
         {
           "name": "DB_HOST_TEST",
-          "value": "task-silo-db-test-2.culss6gmw8na.us-east-1.rds.amazonaws.com"
+          "value": "nucleus-staging-1.culss6gmw8na.us-east-1.rds.amazonaws.com"
         },
         {
           "name": "DB_NAME_TEST",
-          "value": "postgres"
+          "value": "nucleus_staging_db"
         },
         {
           "name": "DB_USERNAME_TEST",
-          "value": "tasksilodbtest"
+          "value": "nucleus_staging"
         },
         {
           "name": "DB_PASSWORD_TEST",
-          "value": "tasksilodbtest"
+          "value": "nucleus_staging"
         }
       ],
       "logConfiguration": {
