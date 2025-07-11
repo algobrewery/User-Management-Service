@@ -12,4 +12,7 @@ public final class HeaderConstants {
 
     public static final String APP_USER_UUID = "x-app-user-uuid";
 
+    // API Key header for Client Management Service integration
+    public static final String API_KEY = "x-api-key";
+
 }

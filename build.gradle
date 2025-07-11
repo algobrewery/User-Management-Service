@@ -29,12 +29,19 @@ dependencies {
     implementation 'org.slf4j:slf4j-api:1.7.36'
     implementation 'ch.qos.logback:logback-classic:1.2.11'
 
+    // Spring Security for API key authentication
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // HTTP client for calling Client Management Service
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
     // AWS CloudWatch dependencies
     implementation 'io.micrometer:micrometer-registry-cloudwatch2'
     implementation 'software.amazon.awssdk:cloudwatch:2.20.56'
     implementation 'io.micrometer:micrometer-core'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
     testImplementation 'org.mockito:mockito-core'
     testImplementation 'org.mockito:mockito-junit-jupiter'
 
