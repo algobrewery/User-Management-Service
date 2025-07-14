@@ -31,14 +31,14 @@ cd client-management
 ./gradlew bootRun
 ```
 
-The service will start on `http://localhost:8081`
+The service will start on `http://localhost:8080`
 
 ### 2. Register a Client and Get API Key
 
 Register a new client to get an API key:
 
 ```bash
-curl -X POST http://localhost:8081/clients \
+curl -X POST http://localhost:8080/clients \
 -H "Content-Type: application/json" \
 -d '{
   "clientName": "User Management Client",
@@ -63,7 +63,7 @@ Update `application.properties` if your Client Management Service runs on a diff
 
 ```properties
 # Client Management Service Configuration
-client-management.service.url=http://localhost:8081
+client-management.service.url=http://localhost:8080
 client-management.service.timeout=5
 ```
 
@@ -73,7 +73,7 @@ client-management.service.timeout=5
 ./gradlew bootRun
 ```
 
-The service will start on `http://localhost:8080`
+The service will start on `http://localhost:8082`
 
 ## Usage
 
@@ -82,7 +82,7 @@ The service will start on `http://localhost:8080`
 All requests to User Management Service now require the `x-api-key` header:
 
 ```bash
-curl -X POST http://localhost:8080/user \
+curl -X POST http://localhost:8082/user \
 -H "Content-Type: application/json" \
 -H "x-api-key: your-generated-api-key-here" \
 -H "x-app-org-uuid: 1d2e3f4a-567b-4c8d-910e-abc123456789" \
@@ -136,13 +136,13 @@ These endpoints don't require authentication:
 
 ### Rotate API Key
 ```bash
-curl -X POST http://localhost:8081/clients/{clientId}/api-keys \
+curl -X POST http://localhost:8080/clients/{clientId}/api-keys \
 -H "x-api-key: current-api-key"
 ```
 
 ### Revoke API Key
 ```bash
-curl -X POST http://localhost:8081/clients/api-keys/{apiKeyId}/revoke \
+curl -X POST http://localhost:8080/clients/api-keys/{apiKeyId}/revoke \
 -H "x-api-key: current-api-key"
 ```
 
@@ -150,7 +150,7 @@ curl -X POST http://localhost:8081/clients/api-keys/{apiKeyId}/revoke \
 
 ### Development
 ```properties
-client-management.service.url=http://localhost:8081
+client-management.service.url=http://localhost:8080
 ```
 
 ### Production
