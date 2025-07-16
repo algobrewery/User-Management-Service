@@ -9,6 +9,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Service for validating API keys with the Client Management Service
@@ -28,14 +29,14 @@ public class ApiKeyAuthenticationService {
 
     /**
      * Validates an API key by calling the Client Management Service
-     * 
+     *
      * @param apiKey the API key to validate
-     * @return true if the API key is valid, false otherwise
+     * @return CompletableFuture that resolves to true if the API key is valid, false otherwise
      */
-    public boolean validateApiKey(String apiKey) {
+    public CompletableFuture<Boolean> validateApiKey(String apiKey) {
         if (apiKey == null || apiKey.trim().isEmpty()) {
             log.debug("API key is null or empty");
-            return false;
+            return CompletableFuture.completedFuture(false);
         }
 
         try {
@@ -43,8 +44,8 @@ public class ApiKeyAuthenticationService {
                     .baseUrl(clientManagementServiceUrl)
                     .build();
 
-            // Call the Client Management Service to validate the API key
-            Boolean isValid = webClient.get()
+            // Call the Client Management Service to validate the API key asynchronously
+            Mono<Boolean> validationMono = webClient.get()
                     .uri("/api/validate")
                     .header("x-api-key", apiKey)
                     .retrieve()
@@ -52,17 +53,23 @@ public class ApiKeyAuthenticationService {
                     .map(response -> response.isValid())
                     .timeout(Duration.ofSeconds(timeoutSeconds))
                     .onErrorReturn(false)
-                    .block();
+                    .doOnNext(isValid -> log.debug("API key validation result: {}", isValid))
+                    .doOnError(WebClientResponseException.class, e ->
+                        log.warn("API key validation failed with status: {} - {}", e.getStatusCode(), e.getMessage()))
+                    .doOnError(Exception.class, e ->
+                        log.error("Error validating API key: {}", e.getMessage(), e));
 
-            log.debug("API key validation result: {}", isValid);
-            return Boolean.TRUE.equals(isValid);
+            // Convert Mono to CompletableFuture
+            return validationMono.toFuture()
+                    .thenApply(isValid -> Boolean.TRUE.equals(isValid))
+                    .exceptionally(throwable -> {
+                        log.error("Unexpected error during API key validation: {}", throwable.getMessage(), throwable);
+                        return false;
+                    });
 
-        } catch (WebClientResponseException e) {
-            log.warn("API key validation failed with status: {} - {}", e.getStatusCode(), e.getMessage());
-            return false;
         } catch (Exception e) {
-            log.error("Error validating API key: {}", e.getMessage(), e);
-            return false;
+            log.error("Error setting up API key validation: {}", e.getMessage(), e);
+            return CompletableFuture.completedFuture(false);
         }
     }
 

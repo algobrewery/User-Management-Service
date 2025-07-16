@@ -15,6 +15,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import static com.userapi.common.constants.HeaderConstants.API_KEY;
 
@@ -53,25 +55,37 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Validate API key
-        if (apiKeyAuthenticationService.validateApiKey(apiKey)) {
-            log.debug("API key validation successful for request to: {}", requestUri);
-            
-            // Set authentication in security context
-            UsernamePasswordAuthenticationToken authentication = 
-                new UsernamePasswordAuthenticationToken(
-                    "api-client", 
-                    null, 
-                    Collections.singletonList(new SimpleGrantedAuthority("ROLE_API_CLIENT"))
-                );
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            
-            filterChain.doFilter(request, response);
-        } else {
-            log.warn("Invalid API key for request to: {}", requestUri);
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        // Validate API key asynchronously
+        try {
+            CompletableFuture<Boolean> validationFuture = apiKeyAuthenticationService.validateApiKey(apiKey);
+
+            // Wait for the validation result with a reasonable timeout
+            Boolean isValid = validationFuture.get(10, TimeUnit.SECONDS);
+
+            if (Boolean.TRUE.equals(isValid)) {
+                log.debug("API key validation successful for request to: {}", requestUri);
+
+                // Set authentication in security context
+                UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                        "api-client",
+                        null,
+                        Collections.singletonList(new SimpleGrantedAuthority("ROLE_API_CLIENT"))
+                    );
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                filterChain.doFilter(request, response);
+            } else {
+                log.warn("Invalid API key for request to: {}", requestUri);
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Invalid API key\",\"message\":\"The provided API key is invalid or expired\"}");
+            }
+        } catch (Exception e) {
+            log.error("Error during API key validation for request to: {} - {}", requestUri, e.getMessage(), e);
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"Invalid API key\",\"message\":\"The provided API key is invalid or expired\"}");
+            response.getWriter().write("{\"error\":\"Authentication service error\",\"message\":\"Unable to validate API key due to service error\"}");
         }
     }
 
