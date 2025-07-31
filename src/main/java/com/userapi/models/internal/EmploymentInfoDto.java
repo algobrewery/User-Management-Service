@@ -24,7 +24,6 @@ public class EmploymentInfoDto {
     @NonNull
     private String organizationUnit;
 
-    @NonNull
     private String reportingManager;
 
     @NonNull

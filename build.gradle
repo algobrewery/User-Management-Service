@@ -6,7 +6,7 @@ plugins {
 
 group = 'com.userapi'
 version = '0.0.1-SNAPSHOT'
-sourceCompatibility = '17'
+sourceCompatibility = '18'
 
 configurations {
     compileOnly {
@@ -47,8 +47,8 @@ dependencies {
 
     runtimeOnly 'org.postgresql:postgresql'
 
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
+    compileOnly 'org.projectlombok:lombok:1.18.26'
+    annotationProcessor 'org.projectlombok:lombok:1.18.26'
 }
 
 test {
@@ -63,4 +63,19 @@ bootJar {
 
 jar {
     enabled = false
+}
+
+// Add Java toolchain to ensure consistent Java version
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(18)
+    }
+}
+
+// Configure annotation processing
+tasks.withType(JavaCompile) {
+    options.compilerArgs += [
+        '-parameters',
+        '-Xlint:none'
+    ]
 }
