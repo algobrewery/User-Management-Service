@@ -6,7 +6,7 @@ plugins {
 
 group = 'com.userapi'
 version = '0.0.1-SNAPSHOT'
-sourceCompatibility = '18'
+sourceCompatibility = '17'
 
 configurations {
     compileOnly {
@@ -66,11 +66,12 @@ jar {
 }
 
 // Add Java toolchain to ensure consistent Java version
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(18)
-    }
-}
+// Commented out to allow using available Java version
+// java {
+//     toolchain {
+//         languageVersion = JavaLanguageVersion.of(17)
+//     }
+// }
 
 // Configure annotation processing
 tasks.withType(JavaCompile) {
