@@ -46,32 +46,46 @@ public class ApiKeyAuthenticationService {
                     .baseUrl(clientManagementServiceUrl)
                     .build();
 
-            // Try to call the root endpoint first to see what's available
-            String validationUrl = "/";
-            log.debug("Calling root endpoint to check API structure: {}{}", clientManagementServiceUrl, validationUrl);
+            // Call the dedicated validation endpoint
+            String validationUrl = "/api/validate";
+            log.debug("Calling validation endpoint: {}{}", clientManagementServiceUrl, validationUrl);
 
             // Call the Client Management Service to validate the API key asynchronously
-            Mono<String> validationMono = webClient.get()
+            Mono<ApiKeyValidationResponse> validationMono = webClient.get()
                     .uri(validationUrl)
                     .header("x-api-key", apiKey)
                     .retrieve()
-                    .bodyToMono(String.class)
+                    .bodyToMono(ApiKeyValidationResponse.class)
                     .timeout(Duration.ofSeconds(timeoutSeconds))
-                    .doOnNext(response -> log.debug("Received response from root endpoint: {}", response))
-                    .doOnError(WebClientResponseException.class, e ->
-                        log.warn("Root endpoint call failed with status: {} - {} - Response body: {}", 
-                                e.getStatusCode(), e.getMessage(), e.getResponseBodyAsString()))
+                    .doOnNext(response -> log.debug("Received validation response: valid={}, message={}", 
+                            response.isValid(), response.getMessage()))
+                    .doOnError(WebClientResponseException.class, e -> {
+                        if (e.getStatusCode().value() == 401 || e.getStatusCode().value() == 403) {
+                            log.debug("API key validation failed - unauthorized: {}", e.getStatusCode());
+                        } else {
+                            log.warn("Validation endpoint call failed with status: {} - {} - Response body: {}", 
+                                    e.getStatusCode(), e.getMessage(), e.getResponseBodyAsString());
+                        }
+                    })
                     .doOnError(Exception.class, e ->
-                        log.error("Error calling root endpoint: {}", e.getMessage(), e));
+                        log.error("Error calling validation endpoint: {}", e.getMessage(), e));
 
-            // Convert Mono to CompletableFuture and return true if we get any response (meaning API key is valid)
+            // Convert Mono to CompletableFuture and return the validation result
             return validationMono.toFuture()
                     .thenApply(response -> {
-                        log.debug("API key validation successful - received response from root endpoint");
-                        return true;
+                        boolean isValid = response.isValid();
+                        log.debug("API key validation result: {}", isValid);
+                        return isValid;
                     })
                     .exceptionally(throwable -> {
-                        log.error("API key validation failed: {}", throwable.getMessage(), throwable);
+                        if (throwable.getCause() instanceof WebClientResponseException) {
+                            WebClientResponseException webEx = (WebClientResponseException) throwable.getCause();
+                            if (webEx.getStatusCode().value() == 401 || webEx.getStatusCode().value() == 403) {
+                                log.debug("API key validation failed - invalid key");
+                                return false;
+                            }
+                        }
+                        log.error("API key validation failed due to error: {}", throwable.getMessage(), throwable);
                         return false;
                     });
 
