@@ -45,7 +45,7 @@ Parameters:
     Description: Database password
   ClientManagementServiceUrl:
     Type: String
-    Default: https://or0u1swckb.execute-api.us-east-1.amazonaws.com/prod
+    Default: https://qokdavzgh7.execute-api.us-east-1.amazonaws.com/prod
     Description: Client Management Service URL
   Environment:
     Type: String
