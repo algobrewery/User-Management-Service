@@ -1,0 +1,5 @@
+[33m5cd85ad[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m Update API endpoint configuration and CloudFormation template
+[33me633a8d[m Updated Api key validation
+[33mbfa4ce3[m Clean up project: Remove unnecessary files and fix deployment configuration
+[33m84e5362[m Your commit message here
+[33m106558d[m Implement CompletableFuture in ApiKeyAuthenticationService
