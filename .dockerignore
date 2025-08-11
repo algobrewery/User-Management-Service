@@ -1,0 +1,12 @@
+.git
+.idea
+.gradle
+build
+gradle
+**/*.iml
+**/.DS_Store
+**/Thumbs.db
+README.md
+cloudformation-template.yml
+scripts/*.ps1
+
