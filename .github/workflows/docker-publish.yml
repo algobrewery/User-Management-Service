@@ -29,7 +29,14 @@ jobs:
       - name: Grant execute permission for Gradle wrapper
         run: chmod +x ./gradlew
 
-      - name: Build & test
+      - name: Build & test (PRs)
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          ./gradlew --version
+          ./gradlew clean test bootJar
+
+      - name: Build & test (push/tag)
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           ./gradlew --version
           ./gradlew clean test bootJar
