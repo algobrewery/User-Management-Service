@@ -29,17 +29,14 @@ jobs:
       - name: Grant execute permission for Gradle wrapper
         run: chmod +x ./gradlew
 
-      - name: Build & test (PRs)
-        if: ${{ github.event_name == 'pull_request' }}
+      - name: Build JAR
         run: |
           ./gradlew --version
-          ./gradlew clean test bootJar
-
-      - name: Build (skip tests) for push/tag
-        if: ${{ github.event_name != 'pull_request' }}
-        run: |
-          ./gradlew --version
-          ./gradlew clean bootJar -x test
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ./gradlew clean test bootJar
+          else
+            ./gradlew clean bootJar -x test
+          fi
 
       - name: Require Docker Hub secrets for push
         if: ${{ github.event_name != 'pull_request' }}
