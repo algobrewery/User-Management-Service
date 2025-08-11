@@ -9,6 +9,10 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
@@ -36,17 +40,6 @@ jobs:
             ./gradlew clean test bootJar
           else
             ./gradlew clean bootJar -x test
-          fi
-
-      - name: Require Docker Hub secrets for push
-        if: ${{ github.event_name != 'pull_request' }}
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
-            echo "DOCKERHUB_USERNAME/DOCKERHUB_TOKEN secrets are required for pushes" >&2
-            exit 1
           fi
 
       - name: Log in to Docker Hub
@@ -80,34 +73,32 @@ jobs:
     needs: build-and-push
     if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
           aws-region: us-east-1
 
-      - name: Deploy to ECS
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Deploy to ECS (force new deployment)
         run: |
-          # Force new deployment to pull latest image
           aws ecs update-service \
             --cluster production-user-management-cluster \
             --service production-user-management-service \
             --force-new-deployment
-          
-          echo "ECS deployment initiated successfully!"
-          
-          # Wait for deployment to complete
+
           echo "Waiting for deployment to complete..."
           aws ecs wait services-stable \
             --cluster production-user-management-cluster \
             --services production-user-management-service
-          
+
           echo "ECS deployment completed successfully!"
 
 
