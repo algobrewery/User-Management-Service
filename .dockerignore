@@ -1,7 +1,6 @@
 .git
 .idea
 .gradle
-build
 gradle
 **/*.iml
 **/.DS_Store
@@ -9,4 +8,8 @@ gradle
 README.md
 cloudformation-template.yml
 scripts/*.ps1
+# Allow JAR files but exclude other build artifacts
+build/
+!build/libs/
+!build/libs/*.jar
 
