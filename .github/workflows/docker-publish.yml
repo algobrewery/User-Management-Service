@@ -73,16 +73,27 @@ jobs:
     needs: build-and-push
     if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
+    env:
+      ROLE_ARN: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_ARN }}
+      AWS_REGION_FALLBACK: ${{ vars.AWS_REGION || secrets.AWS_REGION || 'us-east-1' }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Precheck role ARN
+        run: |
+          if [ -z "${ROLE_ARN}" ]; then
+            echo "AWS role ARN not set. Define repo variable 'AWS_ROLE_TO_ASSUME' or secret 'AWS_ROLE_TO_ASSUME' (or 'AWS_ROLE_ARN')." >&2
+            exit 1
+          fi
+          echo "Using role: ${ROLE_ARN}"
+
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
-          aws-region: us-east-1
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION_FALLBACK }}
 
       - name: Verify AWS identity
         run: aws sts get-caller-identity
