@@ -35,11 +35,11 @@ jobs:
           ./gradlew --version
           ./gradlew clean test bootJar
 
-      - name: Build & test (push/tag)
+      - name: Build (skip tests) for push/tag
         if: ${{ github.event_name != 'pull_request' }}
         run: |
           ./gradlew --version
-          ./gradlew clean test bootJar
+          ./gradlew clean bootJar -x test
 
       - name: Require Docker Hub secrets for push
         if: ${{ github.event_name != 'pull_request' }}
