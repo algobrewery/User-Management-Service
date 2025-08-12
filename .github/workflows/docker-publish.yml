@@ -98,6 +98,13 @@ jobs:
       - name: Verify AWS identity
         run: aws sts get-caller-identity
 
+      - name: Run Health Check
+        run: |
+          echo "Running pre-deployment health check..."
+          pwsh ./health-check.ps1
+        env:
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION_FALLBACK }}
+
       - name: Deploy to ECS (force new deployment)
         run: |
           aws ecs update-service \
