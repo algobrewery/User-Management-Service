@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.test.annotation.Rollback;
 import static com.userapi.common.constants.HeaderConstants.*;
+import static com.userapi.common.constants.HeaderConstants.API_KEY;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -33,6 +34,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 @Rollback
 public class UserApiIntegrationTest {
+
+    private static final String TEST_API_KEY = "APAHdSmELUW4iMvBR6w4xP_q8K-blauC8HKml3CROOA";
 
     @Autowired
     private MockMvc mockMvc;
@@ -111,6 +114,7 @@ public class UserApiIntegrationTest {
 
         mockMvc.perform(post("/user")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header(API_KEY, TEST_API_KEY)
                         .header(APP_ORG_UUID, "org-1")
                         .header(APP_USER_UUID, "user-1")
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
@@ -154,6 +158,7 @@ public class UserApiIntegrationTest {
         // First create the user
         mockMvc.perform(post("/user")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header(API_KEY, TEST_API_KEY)
                         .header(APP_ORG_UUID, "org-1")
                         .header(APP_USER_UUID, "user-1")
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
@@ -165,6 +170,7 @@ public class UserApiIntegrationTest {
         // Then try to create the same user again
         mockMvc.perform(post("/user")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header(API_KEY, TEST_API_KEY)
                         .header(APP_ORG_UUID, "org-1")
                         .header(APP_USER_UUID, "user-1")
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
@@ -182,6 +188,7 @@ public class UserApiIntegrationTest {
 
         // Get the existing user
         mockMvc.perform(get("/user/{userId}", existingUserId)
+                        .header(API_KEY, TEST_API_KEY)
                         .header(APP_ORG_UUID, "org-1")
                         .header(APP_USER_UUID, "user-1")
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
@@ -194,6 +201,7 @@ public class UserApiIntegrationTest {
     @Transactional
     void getUser_WhenUserDoesNotExist_ShouldReturnNotFound() throws Exception {
         mockMvc.perform(get("/user/{userId}", "non-existent-id")
+                        .header(API_KEY, TEST_API_KEY)
                         .header(APP_ORG_UUID, "org-1")
                         .header(APP_USER_UUID, "user-1")
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
@@ -210,6 +218,7 @@ public class UserApiIntegrationTest {
 
         // First get the existing user to verify it exists
         MvcResult getUserResult = mockMvc.perform(get("/user/{userId}", existingUserId)
+                        .header(API_KEY, TEST_API_KEY)
                         .header(APP_ORG_UUID, "org-1")
                         .header(APP_USER_UUID, "user-1")
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
@@ -252,6 +261,7 @@ public class UserApiIntegrationTest {
         // Update the user
         mockMvc.perform(put("/user/{userId}", existingUserId)
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header(API_KEY, TEST_API_KEY)
                         .header(APP_ORG_UUID, "org-1")
                         .header(APP_USER_UUID, "user-1")
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
@@ -262,6 +272,7 @@ public class UserApiIntegrationTest {
 
         // Verify the user was updated
         mockMvc.perform(get("/user/{userId}", existingUserId)
+                        .header(API_KEY, TEST_API_KEY)
                         .header(APP_ORG_UUID, "org-1")
                         .header(APP_USER_UUID, "user-1")
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
@@ -278,6 +289,7 @@ public class UserApiIntegrationTest {
 
         // First verify the user exists
         mockMvc.perform(get("/user/{userId}", existingUserId)
+                        .header(API_KEY, TEST_API_KEY)
                         .header(APP_ORG_UUID, "org-1")
                         .header(APP_USER_UUID, "user-1")
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
@@ -287,6 +299,7 @@ public class UserApiIntegrationTest {
 
         // Then delete the user
         mockMvc.perform(delete("/user/{userId}", existingUserId)
+                        .header(API_KEY, TEST_API_KEY)
                         .header(APP_ORG_UUID, "org-1")
                         .header(APP_USER_UUID, "user-1")
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
@@ -296,6 +309,7 @@ public class UserApiIntegrationTest {
 
         // Verify the user is marked as inactive but still accessible
         mockMvc.perform(get("/user/{userId}", existingUserId)
+                        .header(API_KEY, TEST_API_KEY)
                         .header(APP_ORG_UUID, "org-1")
                         .header(APP_USER_UUID, "user-1")
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")

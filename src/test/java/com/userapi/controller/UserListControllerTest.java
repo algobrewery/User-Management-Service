@@ -2,18 +2,23 @@ package com.userapi.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.userapi.TestConstants;
+import com.userapi.config.TestSecurityConfig;
 import com.userapi.models.external.ListUsersRequest;
 import com.userapi.models.external.ListUsersResponse;
 import com.userapi.models.external.UserHierarchyResponse;
 import com.userapi.service.UserService;
+import com.userapi.service.ApiKeyAuthenticationService;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.Collections;
 
@@ -22,12 +27,20 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import java.util.concurrent.CompletableFuture;
+
 // ✅ Import constants
 import static com.userapi.common.constants.HeaderConstants.*;
 import static com.userapi.TestConstants.*;
 
-@WebMvcTest(UserListController.class)
+@WebMvcTest(value = UserListController.class, excludeAutoConfiguration = {
+        org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
+        org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration.class
+})
+@ActiveProfiles("test")
 public class UserListControllerTest {
+
+    private static final String TEST_API_KEY = "APAHdSmELUW4iMvBR6w4xP_q8K-blauC8HKml3CROOA";
 
     @Autowired
     private MockMvc mockMvc;
@@ -35,11 +48,18 @@ public class UserListControllerTest {
     @MockBean
     private UserService userService;
 
+    @MockBean
+    private ApiKeyAuthenticationService apiKeyAuthenticationService;
+
     @Autowired
     private ObjectMapper objectMapper;
 
     @Test
     void testListUsers() throws Exception {
+        // Setup API key authentication mock
+        Mockito.when(apiKeyAuthenticationService.validateApiKey(TEST_API_KEY))
+                .thenReturn(CompletableFuture.completedFuture(true));
+
         ListUsersRequest request = new ListUsersRequest();
         request.setPage(DEFAULT_PAGE);
         request.setSize(DEFAULT_SIZE);
@@ -59,6 +79,7 @@ public class UserListControllerTest {
 
         mockMvc.perform(post("/users/filter")
                         .contentType(JSON_CONTENT_TYPE)
+                        .header(API_KEY, TEST_API_KEY)
                         .header(APP_ORG_UUID, LIST_TEST_ORG_UUID)
                         .header(APP_USER_UUID, LIST_TEST_USER_UUID)
                         .header(APP_CLIENT_USER_SESSION_UUID, LIST_TEST_SESSION_UUID)
@@ -76,6 +97,10 @@ public class UserListControllerTest {
 
     @Test
     void testGetUserHierarchy() throws Exception {
+        // Setup API key authentication mock
+        Mockito.when(apiKeyAuthenticationService.validateApiKey(TEST_API_KEY))
+                .thenReturn(CompletableFuture.completedFuture(true));
+
         String userId = TEST_USER_ID;
         String orgUuid = LIST_TEST_ORG_UUID;
 
@@ -86,6 +111,7 @@ public class UserListControllerTest {
                 .thenReturn(mockResponse);
 
         mockMvc.perform(get("/users/{userId}/hierarchy", userId)
+                        .header(API_KEY, TEST_API_KEY)
                         .header(APP_ORG_UUID, orgUuid))
                 .andExpect(status().isOk());
     }

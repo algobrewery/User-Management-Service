@@ -56,6 +56,17 @@ test {
     useJUnitPlatform()
 }
 
+// Integration test task
+task integrationTest(type: Test) {
+    useJUnitPlatform()
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/integration/**'
+    
+    // Run integration tests after unit tests
+    mustRunAfter test
+}
+
 // Ensure we create a fat JAR
 bootJar {
     enabled = true

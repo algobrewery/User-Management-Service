@@ -37,9 +37,9 @@ jobs:
         run: |
           ./gradlew --version
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            ./gradlew clean test bootJar
+            ./gradlew clean test integrationTest bootJar
           else
-            ./gradlew clean bootJar -x test
+            ./gradlew clean test integrationTest bootJar
           fi
 
       - name: Log in to Docker Hub
