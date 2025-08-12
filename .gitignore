@@ -5,3 +5,4 @@ build/
 cloudshell-deploy.sh
 local-build-upload-deploy.sh
 .idea/**/*
+.env
