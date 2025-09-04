@@ -45,6 +45,7 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
     testImplementation 'org.mockito:mockito-core'
     testImplementation 'org.mockito:mockito-junit-jupiter'
+    testImplementation 'io.projectreactor:reactor-test'
 
     runtimeOnly 'org.postgresql:postgresql'
 

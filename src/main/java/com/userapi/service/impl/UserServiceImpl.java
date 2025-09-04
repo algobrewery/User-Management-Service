@@ -460,8 +460,7 @@ public class UserServiceImpl implements UserService {
                 .thenCompose(req ->
                         reportingManagerFetcher.fetchMatchingJobProfileUuids(
                                 orgUuid,
-                                Optional.ofNullable(req.getEmploymentInfo())
-                                        .map(Collections::singletonList)
+                                Optional.ofNullable(req.getEmploymentInfoList())
                                         .orElseGet(Collections::emptyList)))
                 .thenCompose(v -> createJobProfiles(userId, orgUuid, v))
                 .thenApply(v -> v.stream().map(JobProfile::getJobProfileUuid).toList())

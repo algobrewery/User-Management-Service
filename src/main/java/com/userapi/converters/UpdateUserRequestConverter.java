@@ -1,11 +1,18 @@
 package com.userapi.converters;
 
+import com.userapi.models.external.EmploymentInfo;
 import com.userapi.models.external.UpdateUserRequest;
+import com.userapi.models.internal.EmploymentInfoDto;
 import com.userapi.models.internal.RequestContext;
 import com.userapi.models.internal.UpdateUserInternalRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component("UpdateUserRequestConverter")
 public class UpdateUserRequestConverter
@@ -34,8 +41,17 @@ public class UpdateUserRequestConverter
                 .status(external.getStatus())
                 .emailInfo(emailInfoConverter.doForward(external.getEmailInfo()))
                 .phoneInfo(phoneInfoConverter.doForward(external.getPhoneInfo()))
-                .employmentInfo(employmentInfoConverter.doForward(external.getEmploymentInfo()))
+                .employmentInfoList(convertEmploymentInfo(external.getEmploymentInfoList()))
                 .requestContext(rc)
                 .build();
+    }
+    
+    private List<EmploymentInfoDto> convertEmploymentInfo(List<EmploymentInfo> employmentInfoList) {
+        return Optional.ofNullable(employmentInfoList)
+                .map(list -> list.stream()
+                        .filter(Objects::nonNull)
+                        .map(employmentInfoConverter::doForward)
+                        .collect(Collectors.toList()))
+                .orElse(null);
     }
 }

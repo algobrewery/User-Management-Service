@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -74,6 +75,7 @@ public class UserController {
     }
 
     @PostMapping
+    @PreAuthorize("hasPermission('USER', 'CREATE')")
     public ResponseEntity<CreateUserResponse> createUser(
             @RequestHeader(APP_ORG_UUID) String orgUUID,
             @RequestHeader(APP_USER_UUID) String userUUID,
@@ -126,6 +128,7 @@ public class UserController {
     }
 
     @GetMapping("/{userId}")
+    @PreAuthorize("hasPermission('USER', 'READ')")
     public ResponseEntity<GetUserResponse> getUserById(
             @RequestHeader(APP_ORG_UUID) String orgUUID,
             @RequestHeader(APP_USER_UUID) String userUUID,
@@ -159,6 +162,7 @@ public class UserController {
     }
 
     @PutMapping("/{userId}")
+    @PreAuthorize("hasPermission('USER', 'UPDATE')")
     public ResponseEntity<UpdateUserResponse> updateUser(
             @RequestHeader(APP_ORG_UUID) String orgUUID,
             @RequestHeader(APP_USER_UUID) String userUUID,
@@ -198,6 +202,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{userId}")
+    @PreAuthorize("hasPermission('USER', 'DELETE')")
     public ResponseEntity<UpdateUserResponse> deactivateUser(
             @RequestHeader(APP_ORG_UUID) String orgUuid,
             @PathVariable String userId) {

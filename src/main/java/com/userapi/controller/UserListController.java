@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,6 +36,7 @@ public class UserListController {
 
     // POST http://52.23.186.179:8080/users/filter
     @PostMapping("/filter")
+    @PreAuthorize("hasPermission('USER', 'READ')")
     public ResponseEntity<ListUsersResponse> listUsers(
             @RequestHeader(APP_ORG_UUID) String orgUuid,
             @RequestHeader(APP_USER_UUID) String userUuid,
@@ -52,6 +54,7 @@ public class UserListController {
     }
 
     @GetMapping("/{userId}/hierarchy")
+    @PreAuthorize("hasPermission('USER', 'READ')")
     public ResponseEntity<UserHierarchyResponse> getUserHierarchy(
             @RequestHeader(APP_ORG_UUID) String orgUUID,
             @PathVariable String userId) {
