@@ -2,6 +2,7 @@
 target/
 .gradle/
 build/
+bin/
 cloudshell-deploy.sh
 local-build-upload-deploy.sh
 .idea/**/*
