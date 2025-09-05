@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -114,6 +115,7 @@ public class RolesServiceClientImpl implements RolesServiceClient {
         return webClient.put()
                 .uri("/role/{roleUuid}", roleUuid)
                 .header("x-app-org-uuid", organizationUuid)
+                .header("x-app-user-uuid", "system-user") // Add missing user UUID header
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(RoleResponse.class)
@@ -128,6 +130,7 @@ public class RolesServiceClientImpl implements RolesServiceClient {
         return webClient.delete()
                 .uri("/role/{roleUuid}", roleUuid)
                 .header("x-app-org-uuid", organizationUuid)
+                .header("x-app-user-uuid", "system-user") // Add missing user UUID header
                 .retrieve()
                 .bodyToMono(Void.class)
                 .doOnSuccess(response -> log.info("Role deleted successfully: {}", roleUuid))
@@ -167,9 +170,21 @@ public class RolesServiceClientImpl implements RolesServiceClient {
 
         return webClient.get()
                 .uri("/user/{userUuid}/roles?organization_uuid={organizationUuid}", userUuid, organizationUuid)
+                .header("x-app-user-uuid", "system-user") // Add missing user UUID header
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<List<RoleResponse>>() {})
-                .doOnSuccess(roles -> log.info("Retrieved {} roles for user: {}", roles.size(), userUuid))
+                .flatMapMany(Flux::fromIterable) // Convert to Flux for individual processing
+                .flatMap(role -> {
+                    // If role has incomplete data, fetch the full role details
+                    if (role.getRoleName() == null || role.getDescription() == null) {
+                        log.info("Role {} has incomplete data, fetching full details", role.getRole_uuid());
+                        return getRoleByUuid(role.getRole_uuid(), organizationUuid);
+                    } else {
+                        return Mono.just(role);
+                    }
+                })
+                .collectList()
+                .doOnSuccess(roles -> log.info("Retrieved {} complete roles for user: {}", roles.size(), userUuid))
                 .doOnError(error -> log.error("Failed to get user roles: {}", error.getMessage()));
     }
 
@@ -180,6 +195,7 @@ public class RolesServiceClientImpl implements RolesServiceClient {
         return webClient.delete()
                 .uri("/user/{userUuid}/roles/{roleUuid}?organization_uuid={organizationUuid}", 
                      userUuid, roleUuid, organizationUuid)
+                .header("x-app-user-uuid", "system-user") // Add missing user UUID header
                 .retrieve()
                 .bodyToMono(Void.class)
                 .doOnSuccess(response -> log.info("Role removed successfully from user: {}", userUuid))
