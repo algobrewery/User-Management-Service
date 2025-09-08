@@ -3,7 +3,7 @@
 
 # Configuration
 $API_BASE_URL = "https://rt786fxfde.execute-api.us-east-1.amazonaws.com/prod/user"
-$API_KEY = "APAHdSmELUW4iMvBR6w4xP_q8K-blauC8HKml3CROOA"
+$API_KEY = "pzKOjno8c-aLPvTz0L4b6U-UGDs7_7qq3W7qu7lpF7w"
 
 # CloudWatch Configuration
 $CLOUDWATCH_NAMESPACE = "UserManagementService/HealthCheck"
