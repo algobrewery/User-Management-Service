@@ -2,11 +2,11 @@ name: Build, Publish Docker Image and Deploy to ECS
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "user-roles" ]
     tags:
       - 'v*'
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "user-roles" ]
   workflow_dispatch:
 
 permissions:
@@ -56,6 +56,7 @@ jobs:
           images: ${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=user-roles,enable={{is_default_branch == false && github.ref == 'refs/heads/user-roles'}}
             type=ref,event=branch
             type=ref,event=tag
             type=sha
