@@ -72,7 +72,7 @@ All communication with the Roles Service uses dedicated DTOs in the `com.userapi
 
 ```properties
 # Roles and Permissions Service Configuration
-roles.service.url=http://localhost:8081
+roles.service.url=https://i9vn73mmkg.execute-api.us-east-1.amazonaws.com/prod/
 roles.service.timeout=10
 ```
 

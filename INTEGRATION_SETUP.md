@@ -49,8 +49,8 @@ Update your `application.properties` if needed:
 # Your service should run on a different port
 server.port=8081
 
-# Roles service configuration (already updated)
-roles.service.url=http://localhost:8080
+# Roles service configuration (updated to AWS endpoint)
+roles.service.url=https://i9vn73mmkg.execute-api.us-east-1.amazonaws.com/prod/
 roles.service.timeout=10
 ```
 
