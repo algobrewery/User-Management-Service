@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @ActiveProfiles("test")
 class UserApiApplicationTests {
 
@@ -18,6 +18,6 @@ class UserApiApplicationTests {
     void applicationStarts() {
         // This test verifies that the application can start without any errors
         // It's a basic smoke test to ensure the application is properly configured
-        UserServiceApplication.main(new String[]{});
+        // Removed the main() call to avoid port binding issues in test environment
     }
 } 

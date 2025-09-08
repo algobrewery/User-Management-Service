@@ -17,15 +17,15 @@ class RolesServiceClientTest {
         JsonNode policy = objectMapper.readTree("{\"test\": \"policy\"}");
         
         CreateRoleRequest request = CreateRoleRequest.builder()
-                .name("Test Role")
+                .roleName("Test Role")
                 .description("Test Description")
-                .role_management_type("CUSTOMER_MANAGED")
+                .roleManagementType("CUSTOMER_MANAGED")
                 .policy(policy)
                 .build();
 
         assert request.getName().equals("Test Role");
         assert request.getDescription().equals("Test Description");
-        assert request.getRole_management_type().equals("CUSTOMER_MANAGED");
+        assert request.getRoleManagementType().equals("CUSTOMER_MANAGED");
         assert request.getPolicy().equals(policy);
     }
 

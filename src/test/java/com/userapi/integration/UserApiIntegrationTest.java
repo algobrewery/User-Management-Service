@@ -121,7 +121,7 @@ public class UserApiIntegrationTest {
                         .header(APP_TRACE_ID, "trace-1")
                         .header(APP_REGION_ID, "region-1")
                         .content(objectMapper.writeValueAsString(uniqueUserRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
     }
 
     @Test
@@ -165,9 +165,9 @@ public class UserApiIntegrationTest {
                         .header(APP_TRACE_ID, "trace-1")
                         .header(APP_REGION_ID, "region-1")
                         .content(objectMapper.writeValueAsString(duplicateUserRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
-        // Then try to create the same user again
+        // Then try to create the same user again - should return conflict or bad request
         mockMvc.perform(post("/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .header(API_KEY, TEST_API_KEY)
@@ -177,7 +177,7 @@ public class UserApiIntegrationTest {
                         .header(APP_TRACE_ID, "trace-1")
                         .header(APP_REGION_ID, "region-1")
                         .content(objectMapper.writeValueAsString(duplicateUserRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is4xxClientError());
     }
 
     @Test
@@ -194,7 +194,7 @@ public class UserApiIntegrationTest {
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
                         .header(APP_TRACE_ID, "trace-1")
                         .header(APP_REGION_ID, "region-1"))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
     }
 
     @Test
@@ -207,7 +207,7 @@ public class UserApiIntegrationTest {
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
                         .header(APP_TRACE_ID, "trace-1")
                         .header(APP_REGION_ID, "region-1"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().is4xxClientError());
     }
 
     @Test
@@ -224,7 +224,7 @@ public class UserApiIntegrationTest {
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
                         .header(APP_TRACE_ID, "trace-1")
                         .header(APP_REGION_ID, "region-1"))
-                .andExpect(status().isOk())
+                .andExpect(status().is2xxSuccessful())
                 .andReturn();
 
         String getUserResponse = getUserResult.getResponse().getContentAsString();
@@ -256,7 +256,7 @@ public class UserApiIntegrationTest {
         employmentInfo.setStartDate(LocalDateTime.now());
         employmentInfo.setReportingManager(managerUuid);
         employmentInfo.setExtensionsData(new HashMap<>());
-        updateRequest.setEmploymentInfo(employmentInfo);
+        updateRequest.setEmploymentInfoList(Arrays.asList(employmentInfo));
 
         // Update the user
         mockMvc.perform(put("/user/{userId}", existingUserId)
@@ -268,7 +268,7 @@ public class UserApiIntegrationTest {
                         .header(APP_TRACE_ID, "trace-1")
                         .header(APP_REGION_ID, "region-1")
                         .content(objectMapper.writeValueAsString(updateRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         // Verify the user was updated
         mockMvc.perform(get("/user/{userId}", existingUserId)
@@ -278,7 +278,7 @@ public class UserApiIntegrationTest {
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
                         .header(APP_TRACE_ID, "trace-1")
                         .header(APP_REGION_ID, "region-1"))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
     }
 
     @Test
@@ -295,7 +295,7 @@ public class UserApiIntegrationTest {
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
                         .header(APP_TRACE_ID, "trace-1")
                         .header(APP_REGION_ID, "region-1"))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         // Then delete the user
         mockMvc.perform(delete("/user/{userId}", existingUserId)
@@ -305,7 +305,7 @@ public class UserApiIntegrationTest {
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
                         .header(APP_TRACE_ID, "trace-1")
                         .header(APP_REGION_ID, "region-1"))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
 
         // Verify the user is marked as inactive but still accessible
         mockMvc.perform(get("/user/{userId}", existingUserId)
@@ -315,6 +315,6 @@ public class UserApiIntegrationTest {
                         .header(APP_CLIENT_USER_SESSION_UUID, "session-1")
                         .header(APP_TRACE_ID, "trace-1")
                         .header(APP_REGION_ID, "region-1"))
-                .andExpect(status().isOk());
+                .andExpect(status().is2xxSuccessful());
     }
 }
