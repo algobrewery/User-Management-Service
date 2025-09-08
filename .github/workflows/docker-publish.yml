@@ -59,8 +59,8 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=user-roles,enable={{is_default_branch == false && github.ref == 'refs/heads/user-roles'}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+            type=raw,value=user-roles,enable=${{ github.ref == 'refs/heads/user-roles' }}
             type=ref,event=branch
             type=ref,event=tag
             type=sha
