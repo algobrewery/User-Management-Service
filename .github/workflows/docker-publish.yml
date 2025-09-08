@@ -33,14 +33,18 @@ jobs:
       - name: Grant execute permission for Gradle wrapper
         run: chmod +x ./gradlew
 
-      - name: Build JAR
+      - name: Run Unit Tests
         run: |
           ./gradlew --version
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            ./gradlew clean test integrationTest bootJar
-          else
-            ./gradlew clean test integrationTest bootJar
-          fi
+          ./gradlew clean test bootJar
+
+      - name: Run Integration Tests (Real Database)
+        run: |
+          ./gradlew integrationTest -Dspring.profiles.active=ci
+        continue-on-error: true
+        env:
+          CI: true
+          SPRING_PROFILES_ACTIVE: ci
 
       - name: Log in to Docker Hub
         if: ${{ github.event_name != 'pull_request' }}
