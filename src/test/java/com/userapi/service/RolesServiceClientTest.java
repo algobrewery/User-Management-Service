@@ -48,10 +48,14 @@ class RolesServiceClientTest {
     void testPermissionCheckRequestBuilder() {
         // Test the permission check DTO builder
         PermissionCheckRequest request = PermissionCheckRequest.builder()
+                .user_uuid("user-uuid")
+                .organization_uuid("org-uuid")
                 .resource("users")
                 .action("read")
                 .build();
 
+        assert request.getUser_uuid().equals("user-uuid");
+        assert request.getOrganization_uuid().equals("org-uuid");
         assert request.getResource().equals("users");
         assert request.getAction().equals("read");
     }

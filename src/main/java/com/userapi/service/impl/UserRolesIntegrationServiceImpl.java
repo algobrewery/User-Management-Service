@@ -49,6 +49,7 @@ public class UserRolesIntegrationServiceImpl implements UserRolesIntegrationServ
             CreateRoleRequest request = CreateRoleRequest.builder()
                     .roleName("Admin")
                     .description("Default admin role with full access")
+                    .organizationUuid(organizationUuid)
                     .roleManagementType("SYSTEM_MANAGED")
                     .policy(adminPolicy)
                     .build();
@@ -86,6 +87,7 @@ public class UserRolesIntegrationServiceImpl implements UserRolesIntegrationServ
             CreateRoleRequest request = CreateRoleRequest.builder()
                     .roleName("User")
                     .description("Default user role with limited access")
+                    .organizationUuid(organizationUuid)
                     .roleManagementType("SYSTEM_MANAGED")
                     .policy(userPolicy)
                     .build();

@@ -41,15 +41,6 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler(InvalidRequestException.class)
-    public ResponseEntity<Object> handleInvalidRequestException(InvalidRequestException ex) {
-        logger.warn("Invalid request exception: {}", ex.getMessage());
-        Map<String, String> body = new HashMap<>();
-        body.put("message", ex.getMessage());
-        body.put("error", "INVALID_REQUEST");
-        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
-    }
-
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Object> handleAccessDeniedException(AccessDeniedException ex) {
         logger.warn("Access denied exception: {}", ex.getMessage());

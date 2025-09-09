@@ -14,8 +14,7 @@ import javax.validation.constraints.NotBlank;
 public class AssignRoleRequest {
     @NotBlank(message = "Role UUID is required")
     private String role_uuid;
-    
-    // Note: organization_uuid is removed - it's extracted from HTTP headers for security
-    // This prevents clients from potentially providing different organization UUIDs
-    // in the request body vs headers, which could be a security risk
+
+    @NotBlank(message = "Organization UUID is required")
+    private String organization_uuid;
 }

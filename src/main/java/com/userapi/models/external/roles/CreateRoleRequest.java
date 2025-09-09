@@ -30,9 +30,8 @@ public class CreateRoleRequest {
     @Size(max = 255, message = "Description must not exceed 255 characters")
     private String description;
 
-    // Note: organizationUuid is removed - it's extracted from HTTP headers for security
-    // This prevents clients from potentially providing different organization UUIDs
-    // in the request body vs headers, which could be a security risk
+    @JsonProperty("organization_uuid")
+    private String organizationUuid;
 
     @JsonProperty("role_management_type")
     private String roleManagementType;

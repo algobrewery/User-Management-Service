@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -37,7 +39,7 @@ public class RoleResponse {
     @JsonProperty("created_by")
     private String created_by;
 
-    // Backward compatibility method - only keep this one as it provides a different method name
+    // Backward compatibility methods
     public String getName() {
         return roleName;
     }
@@ -46,6 +48,54 @@ public class RoleResponse {
         this.roleName = name;
     }
 
+    public String getRole_uuid() {
+        return role_uuid;
+    }
+
+    public void setRole_uuid(String role_uuid) {
+        this.role_uuid = role_uuid;
+    }
+
+    public String getOrganization_uuid() {
+        return organization_uuid;
+    }
+
+    public void setOrganization_uuid(String organization_uuid) {
+        this.organization_uuid = organization_uuid;
+    }
+
+    public String getRole_management_type() {
+        return role_management_type;
+    }
+
+    public void setRole_management_type(String role_management_type) {
+        this.role_management_type = role_management_type;
+    }
+
+    public String getCreated_at() {
+        return created_at;
+    }
+
+    public void setCreated_at(String created_at) {
+        this.created_at = created_at;
+    }
+
+    public String getCreated_by() {
+        return created_by;
+    }
+
+    public void setCreated_by(String created_by) {
+        this.created_by = created_by;
+    }
+
     // Legacy fields for backward compatibility
     private Boolean is_active;
+
+    public Boolean getIs_active() {
+        return is_active;
+    }
+
+    public void setIs_active(Boolean is_active) {
+        this.is_active = is_active;
+    }
 }
