@@ -16,7 +16,7 @@ public interface RolesServiceClient {
     
     Mono<List<RoleResponse>> getSystemManagedRoles();
     
-    Mono<RoleResponse> updateRole(String roleUuid, CreateRoleRequest request, String organizationUuid);
+    Mono<RoleResponse> updateRole(String roleUuid, UpdateRoleRequest request, String organizationUuid);
     
     Mono<Void> deleteRole(String roleUuid, String organizationUuid);
     
@@ -31,4 +31,7 @@ public interface RolesServiceClient {
     Mono<PermissionCheckResponse> checkPermission(PermissionCheckRequest request);
     
     Mono<Boolean> hasPermission(String userUuid, String organizationUuid, String resource, String action);
+    
+    // Role Filtering and Search
+    Mono<ListRolesResponse> filterRoles(ListRolesRequest request, String organizationUuid);
 }

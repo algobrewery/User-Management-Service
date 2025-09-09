@@ -12,11 +12,13 @@ import javax.validation.constraints.NotBlank;
 @AllArgsConstructor
 @Builder
 public class PermissionCheckRequest {
-    @NotBlank(message = "User UUID is required")
-    private String user_uuid;
+    // Note: user_uuid is removed - it's extracted from HTTP headers for security
+    // This prevents clients from potentially providing different user UUIDs
+    // in the request body vs headers, which could be a security risk
 
-    @NotBlank(message = "Organization UUID is required")
-    private String organization_uuid;
+    // Note: organization_uuid is removed - it's extracted from HTTP headers for security
+    // This prevents clients from potentially providing different organization UUIDs
+    // in the request body vs headers, which could be a security risk
 
     @NotBlank(message = "Resource is required")
     private String resource;

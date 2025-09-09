@@ -1,5 +1,7 @@
 package com.userapi.controller;
 
+import com.userapi.common.validation.HeaderValidator;
+import com.userapi.exception.WebClientErrorHandler;
 import com.userapi.models.external.roles.*;
 import com.userapi.service.RolesServiceClient;
 import com.userapi.service.UserRolesIntegrationService;
@@ -13,7 +15,6 @@ import reactor.core.publisher.Mono;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-import java.util.List;
 
 @RestController
 @RequestMapping("/role")
@@ -24,20 +25,38 @@ public class RolesController {
     private final RolesServiceClient rolesServiceClient;
     private final UserRolesIntegrationService userRolesIntegrationService;
 
+    /**
+     * Helper method to get list of fields being updated for logging
+     */
+    private String getUpdateableFields(UpdateRoleRequest request) {
+        StringBuilder fields = new StringBuilder();
+        if (request.getDescription() != null) fields.append("description ");
+        if (request.getPolicy() != null) fields.append("policy ");
+        if (request.getIs_active() != null) fields.append("is_active ");
+        return fields.toString().trim();
+    }
+
     @PostMapping
     @PreAuthorize("hasPermission('ROLE', 'CREATE')")
     public Mono<ResponseEntity<RoleResponse>> createRole(
             @Valid @RequestBody CreateRoleRequest request,
             HttpServletRequest httpRequest) {
         
-        String organizationUuid = httpRequest.getHeader("x-app-org-uuid");
-        String userUuid = httpRequest.getHeader("x-app-user-uuid");
+        // Validate required headers
+        HeaderValidator.ValidatedHeaders headers = HeaderValidator.getValidatedHeaders(httpRequest);
+        String organizationUuid = headers.getOrganizationUuid();
+        String userUuid = headers.getUserUuid();
         
-        log.info("Creating role: {} for organization: {} by user: {}", 
-                request.getRoleName(), organizationUuid, userUuid);
+        log.info("Creating role: {} for organization: {} by user: {} (traceId: {})", 
+                request.getRoleName(), organizationUuid, userUuid, headers.getTraceId());
         
         return rolesServiceClient.createRole(request, organizationUuid)
-                .map(response -> ResponseEntity.status(HttpStatus.CREATED).body(response));
+                .map(response -> {
+                    log.info("Role created successfully: {} with name: {}", response.getRole_uuid(), response.getName());
+                    return ResponseEntity.status(HttpStatus.CREATED).body(response);
+                })
+                .onErrorResume(error -> WebClientErrorHandler.handleWebClientError(error, "create role", 
+                        "role=" + request.getRoleName() + ", org=" + organizationUuid));
     }
 
     @GetMapping("/{roleUuid}")
@@ -45,51 +64,67 @@ public class RolesController {
             @PathVariable String roleUuid,
             HttpServletRequest httpRequest) {
         
-        String organizationUuid = httpRequest.getHeader("x-app-org-uuid");
+        // Validate required headers
+        HeaderValidator.ValidatedHeaders headers = HeaderValidator.getValidatedHeaders(httpRequest);
+        String organizationUuid = headers.getOrganizationUuid();
         
-        log.info("Getting role: {} for organization: {}", roleUuid, organizationUuid);
+        log.info("Getting role: {} for organization: {} (traceId: {})", 
+                roleUuid, organizationUuid, headers.getTraceId());
         
         return rolesServiceClient.getRoleByUuid(roleUuid, organizationUuid)
-                .map(ResponseEntity::ok)
-                .onErrorReturn(ResponseEntity.notFound().build());
+                .map(response -> {
+                    log.info("Role retrieved successfully: {} with name: {}", response.getRole_uuid(), response.getName());
+                    return ResponseEntity.ok(response);
+                })
+                .onErrorResume(error -> WebClientErrorHandler.handleWebClientError(error, "get role", 
+                        "roleUuid=" + roleUuid + ", org=" + organizationUuid));
     }
 
-    @GetMapping("/organization/{organizationUuid}")
-    public Mono<ResponseEntity<List<RoleResponse>>> getOrganizationRoles(
-            @PathVariable String organizationUuid) {
+    @PostMapping("/filter")
+    @PreAuthorize("hasPermission('ROLE', 'READ')")
+    public Mono<ResponseEntity<ListRolesResponse>> filterRoles(
+            @Valid @RequestBody ListRolesRequest request,
+            HttpServletRequest httpRequest) {
         
-        log.info("Getting roles for organization: {}", organizationUuid);
+        // Validate required headers
+        HeaderValidator.ValidatedHeaders headers = HeaderValidator.getValidatedHeaders(httpRequest);
+        String organizationUuid = headers.getOrganizationUuid();
+        String userUuid = headers.getUserUuid();
         
-        return rolesServiceClient.getOrganizationRoles(organizationUuid)
-                .map(ResponseEntity::ok)
-                .onErrorReturn(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
-    }
-
-    @GetMapping("/system-managed")
-    @PreAuthorize("hasPermission('SYSTEM_ROLE', 'READ')")
-    public Mono<ResponseEntity<List<RoleResponse>>> getSystemManagedRoles() {
-        log.info("Getting system managed roles");
+        log.info("Filtering roles for organization: {} by user: {} with criteria: {} (traceId: {})", 
+                organizationUuid, userUuid, request, headers.getTraceId());
         
-        return rolesServiceClient.getSystemManagedRoles()
-                .map(ResponseEntity::ok)
-                .onErrorReturn(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
+        return rolesServiceClient.filterRoles(request, organizationUuid)
+                .map(response -> {
+                    log.info("Found {} roles for organization: {}", response.getTotalElements(), organizationUuid);
+                    return ResponseEntity.ok(response);
+                })
+                .onErrorResume(error -> WebClientErrorHandler.handleWebClientError(error, "filter roles", 
+                        "org=" + organizationUuid + ", page=" + request.getPage() + ", size=" + request.getSize()));
     }
 
     @PutMapping("/{roleUuid}")
     @PreAuthorize("hasPermission('ROLE', 'UPDATE')")
     public Mono<ResponseEntity<RoleResponse>> updateRole(
             @PathVariable String roleUuid,
-            @Valid @RequestBody CreateRoleRequest request,
+            @Valid @RequestBody UpdateRoleRequest request,
             HttpServletRequest httpRequest) {
         
-        String organizationUuid = httpRequest.getHeader("x-app-org-uuid");
-        String userUuid = httpRequest.getHeader("x-app-user-uuid");
+        // Validate required headers
+        HeaderValidator.ValidatedHeaders headers = HeaderValidator.getValidatedHeaders(httpRequest);
+        String organizationUuid = headers.getOrganizationUuid();
+        String userUuid = headers.getUserUuid();
         
-        log.info("Updating role: {} for organization: {} by user: {}", 
-                roleUuid, organizationUuid, userUuid);
+        log.info("Updating role: {} for organization: {} by user: {} - updating fields: {} (traceId: {})", 
+                roleUuid, organizationUuid, userUuid, getUpdateableFields(request), headers.getTraceId());
         
         return rolesServiceClient.updateRole(roleUuid, request, organizationUuid)
-                .map(ResponseEntity::ok);
+                .map(response -> {
+                    log.info("Role updated successfully: {} with name: {}", response.getRole_uuid(), response.getName());
+                    return ResponseEntity.ok(response);
+                })
+                .onErrorResume(error -> WebClientErrorHandler.handleWebClientError(error, "update role", 
+                        "roleUuid=" + roleUuid + ", org=" + organizationUuid));
     }
 
     @DeleteMapping("/{roleUuid}")
@@ -98,16 +133,18 @@ public class RolesController {
             @PathVariable String roleUuid,
             HttpServletRequest httpRequest) {
         
-        String organizationUuid = httpRequest.getHeader("x-app-org-uuid");
-        String userUuid = httpRequest.getHeader("x-app-user-uuid");
+        // Validate required headers
+        HeaderValidator.ValidatedHeaders headers = HeaderValidator.getValidatedHeaders(httpRequest);
+        String organizationUuid = headers.getOrganizationUuid();
+        String userUuid = headers.getUserUuid();
         
-        log.info("Deleting role: {} for organization: {} by user: {}", 
-                roleUuid, organizationUuid, userUuid);
+        log.info("Deleting role: {} for organization: {} by user: {} (traceId: {})", 
+                roleUuid, organizationUuid, userUuid, headers.getTraceId());
         
         return rolesServiceClient.deleteRole(roleUuid, organizationUuid)
                 .then(Mono.just(ResponseEntity.ok("Role " + roleUuid + " deleted successfully")))
-                .onErrorReturn(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body("Failed to delete role: " + roleUuid));
+                .onErrorResume(error -> WebClientErrorHandler.handleWebClientErrorForString(error, "delete role", 
+                        "roleUuid=" + roleUuid + ", org=" + organizationUuid));
     }
 
     @PostMapping("/user/{userUuid}/assign")
@@ -117,29 +154,18 @@ public class RolesController {
             @Valid @RequestBody AssignRoleRequest request,
             HttpServletRequest httpRequest) {
         
-        String organizationUuid = httpRequest.getHeader("x-app-org-uuid");
-        String assignedBy = httpRequest.getHeader("x-app-user-uuid");
+        // Validate required headers
+        HeaderValidator.ValidatedHeaders headers = HeaderValidator.getValidatedHeaders(httpRequest);
+        String organizationUuid = headers.getOrganizationUuid();
+        String assignedBy = headers.getUserUuid();
         
-        log.info("Assigning role: {} to user: {} in organization: {} by user: {}", 
-                request.getRole_uuid(), userUuid, organizationUuid, assignedBy);
+        log.info("Assigning role: {} to user: {} in organization: {} by user: {} (traceId: {})", 
+                request.getRole_uuid(), userUuid, organizationUuid, assignedBy, headers.getTraceId());
         
         return rolesServiceClient.assignRoleToUser(userUuid, request.getRole_uuid(), organizationUuid)
                 .then(Mono.just(ResponseEntity.ok("Role " + request.getRole_uuid() + " assigned successfully to user: " + userUuid)))
-                .onErrorReturn(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to assign role"));
-    }
-
-    @GetMapping("/user/{userUuid}")
-    public Mono<ResponseEntity<List<RoleResponse>>> getUserRoles(
-            @PathVariable String userUuid,
-            HttpServletRequest httpRequest) {
-        
-        String organizationUuid = httpRequest.getHeader("x-app-org-uuid");
-        
-        log.info("Getting roles for user: {} in organization: {}", userUuid, organizationUuid);
-        
-        return rolesServiceClient.getUserRoles(userUuid, organizationUuid)
-                .map(ResponseEntity::ok)
-                .onErrorReturn(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
+                .onErrorResume(error -> WebClientErrorHandler.handleWebClientErrorForString(error, "assign role", 
+                        "user=" + userUuid + ", role=" + request.getRole_uuid() + ", org=" + organizationUuid));
     }
 
     @DeleteMapping("/user/{userUuid}/roles/{roleUuid}")
@@ -148,29 +174,47 @@ public class RolesController {
             @PathVariable String roleUuid,
             HttpServletRequest httpRequest) {
         
-        String organizationUuid = httpRequest.getHeader("x-app-org-uuid");
-        String removedBy = httpRequest.getHeader("x-app-user-uuid");
+        // Validate required headers
+        HeaderValidator.ValidatedHeaders headers = HeaderValidator.getValidatedHeaders(httpRequest);
+        String organizationUuid = headers.getOrganizationUuid();
+        String removedBy = headers.getUserUuid();
         
-        log.info("Removing role: {} from user: {} in organization: {} by user: {}", 
-                roleUuid, userUuid, organizationUuid, removedBy);
+        log.info("Removing role: {} from user: {} in organization: {} by user: {} (traceId: {})", 
+                roleUuid, userUuid, organizationUuid, removedBy, headers.getTraceId());
         
         return rolesServiceClient.removeRoleFromUser(userUuid, roleUuid, organizationUuid)
                 .then(Mono.just(ResponseEntity.ok("Role " + roleUuid + " removed successfully from user " + userUuid)))
-                .onErrorReturn(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body("Failed to remove role " + roleUuid + " from user " + userUuid));
+                .onErrorResume(error -> WebClientErrorHandler.handleWebClientErrorForString(error, "remove role from user", 
+                        "user=" + userUuid + ", role=" + roleUuid + ", org=" + organizationUuid));
     }
 
     @PostMapping("/permissions/check")
     // @PreAuthorize("hasPermission('PERMISSION', 'CHECK')") // REMOVED - Circular dependency issue
     public Mono<ResponseEntity<PermissionCheckResponse>> checkPermission(
-            @Valid @RequestBody PermissionCheckRequest request) {
+            @Valid @RequestBody PermissionCheckRequest request,
+            HttpServletRequest httpRequest) {
 
-        log.info("Checking permission for user: {} on resource: {} with action: {}", 
-                request.getUser_uuid(), request.getResource(), request.getAction());
+        // Validate required headers
+        HeaderValidator.ValidatedHeaders headers = HeaderValidator.getValidatedHeaders(httpRequest);
+        String organizationUuid = headers.getOrganizationUuid();
+        String userUuid = headers.getUserUuid();
 
-        return rolesServiceClient.checkPermission(request)
-                .map(ResponseEntity::ok)
-                .onErrorReturn(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
+        log.info("Checking permission for user: {} on resource: {} with action: {} in organization: {} (traceId: {})", 
+                userUuid, request.getResource(), request.getAction(), organizationUuid, headers.getTraceId());
+
+        // Use the service method that takes organization UUID as separate parameter
+        return rolesServiceClient.hasPermission(userUuid, organizationUuid, request.getResource(), request.getAction())
+                .map(hasPermission -> {
+                    PermissionCheckResponse response = PermissionCheckResponse.builder()
+                            .resource(request.getResource())
+                            .action(request.getAction())
+                            .has_permission(hasPermission)
+                            .message(hasPermission ? "Permission granted" : "Permission denied")
+                            .build();
+                    return ResponseEntity.ok(response);
+                })
+                .onErrorResume(error -> WebClientErrorHandler.handleWebClientError(error, "check permission", 
+                        "user=" + userUuid + ", resource=" + request.getResource() + ", action=" + request.getAction()));
     }
 
     @PostMapping("/user/{userUuid}/assign-admin")
@@ -187,19 +231,8 @@ public class RolesController {
 
         return userRolesIntegrationService.checkUserExistsAndAssignAdminRole(userUuid, organizationUuid, assignedBy)
                 .then(Mono.just(ResponseEntity.ok("Admin role assigned successfully to user: " + userUuid)))
-                .onErrorResume(error -> {
-                    log.error("Failed to assign admin role to user: {} - {}", userUuid, error.getMessage());
-                    if (error.getMessage().contains("User not found")) {
-                        return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                                .body("User not found in database: " + userUuid));
-                    } else if (error.getMessage().contains("Admin role not found")) {
-                        return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                                .body("Admin role not found for organization: " + organizationUuid));
-                    } else {
-                        return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                .body("Failed to assign admin role: " + error.getMessage()));
-                    }
-                });
+                .onErrorResume(error -> WebClientErrorHandler.handleBusinessLogicError("assign admin role", 
+                        "user=" + userUuid + ", org=" + organizationUuid, error.getMessage()));
     }
 
     @PostMapping("/user/{userUuid}/assign-role/{roleUuid}")
@@ -217,16 +250,8 @@ public class RolesController {
 
         return userRolesIntegrationService.checkUserExistsAndAssignRoleByUuid(userUuid, roleUuid, organizationUuid, assignedBy)
                 .then(Mono.just(ResponseEntity.ok("Role " + roleUuid + " assigned successfully to user: " + userUuid)))
-                .onErrorResume(error -> {
-                    log.error("Failed to assign role {} to user: {} - {}", roleUuid, userUuid, error.getMessage());
-                    if (error.getMessage().contains("User not found")) {
-                        return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                                .body("User not found in database: " + userUuid));
-                    } else {
-                        return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                .body("Failed to assign role: " + error.getMessage()));
-                    }
-                });
+                .onErrorResume(error -> WebClientErrorHandler.handleBusinessLogicError("assign role by UUID", 
+                        "user=" + userUuid + ", role=" + roleUuid + ", org=" + organizationUuid, error.getMessage()));
     }
 
     // ========== BOOTSTRAP ENDPOINTS (NO AUTHORIZATION REQUIRED) ==========
@@ -247,13 +272,19 @@ public class RolesController {
                 .onErrorReturn(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
     }
 
-    @GetMapping("/bootstrap/system-managed")
-    public Mono<ResponseEntity<List<RoleResponse>>> bootstrapGetSystemManagedRoles() {
-        log.info("BOOTSTRAP: Getting system managed roles");
+    @PostMapping("/bootstrap/filter")
+    public Mono<ResponseEntity<ListRolesResponse>> bootstrapFilterRoles(
+            @Valid @RequestBody ListRolesRequest request) {
+        log.info("BOOTSTRAP: Filtering roles with criteria: {}", request);
 
-        return rolesServiceClient.getSystemManagedRoles()
-                .map(ResponseEntity::ok)
-                .onErrorReturn(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
+        // For bootstrap, we don't need organization context for system managed roles
+        return rolesServiceClient.filterRoles(request, "system")
+                .map(response -> {
+                    log.info("BOOTSTRAP: Found {} roles", response.getTotalElements());
+                    return ResponseEntity.ok(response);
+                })
+                .onErrorResume(error -> WebClientErrorHandler.handleWebClientError(error, "bootstrap filter roles", 
+                        "page=" + request.getPage() + ", size=" + request.getSize()));
     }
 
     @PostMapping("/bootstrap/organization/{organizationUuid}/setup")
@@ -269,11 +300,8 @@ public class RolesController {
                 .flatMap(adminRole -> userRolesIntegrationService.assignAdminRoleToUser(adminUserUuid, organizationUuid, "system")
                         .thenReturn(adminRole))
                 .map(adminRole -> ResponseEntity.ok("Organization setup complete. Admin role created and assigned to user: " + adminUserUuid))
-                .onErrorResume(error -> {
-                    log.error("BOOTSTRAP: Failed to setup organization: {}", error.getMessage());
-                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .body("Failed to setup organization: " + error.getMessage()));
-                });
+                .onErrorResume(error -> WebClientErrorHandler.handleBusinessLogicError("bootstrap organization setup", 
+                        "org=" + organizationUuid + ", admin=" + adminUserUuid, error.getMessage()));
     }
 
     @PostMapping("/bootstrap/user/{userUuid}/assign-admin")
@@ -286,10 +314,7 @@ public class RolesController {
 
         return userRolesIntegrationService.assignAdminRoleToUser(userUuid, organizationUuid, assignedBy)
                 .then(Mono.just(ResponseEntity.ok("Admin role assigned successfully to user: " + userUuid)))
-                .onErrorResume(error -> {
-                    log.error("BOOTSTRAP: Failed to assign admin role: {}", error.getMessage());
-                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .body("Failed to assign admin role: " + error.getMessage()));
-                });
+                .onErrorResume(error -> WebClientErrorHandler.handleBusinessLogicError("bootstrap assign admin role", 
+                        "user=" + userUuid + ", org=" + organizationUuid, error.getMessage()));
     }
 }

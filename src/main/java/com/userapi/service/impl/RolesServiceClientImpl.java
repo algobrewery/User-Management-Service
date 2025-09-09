@@ -109,7 +109,7 @@ public class RolesServiceClientImpl implements RolesServiceClient {
     }
 
     @Override
-    public Mono<RoleResponse> updateRole(String roleUuid, CreateRoleRequest request, String organizationUuid) {
+    public Mono<RoleResponse> updateRole(String roleUuid, UpdateRoleRequest request, String organizationUuid) {
         log.info("Updating role: {} for organization: {}", roleUuid, organizationUuid);
         
         return webClient.put()
@@ -144,7 +144,6 @@ public class RolesServiceClientImpl implements RolesServiceClient {
         // Updated to match GitHub service structure
         AssignRoleRequest request = AssignRoleRequest.builder()
                 .role_uuid(roleUuid)
-                .organization_uuid(organizationUuid)
                 .build();
 
         return webClient.post()
@@ -204,8 +203,8 @@ public class RolesServiceClientImpl implements RolesServiceClient {
 
     @Override
     public Mono<PermissionCheckResponse> checkPermission(PermissionCheckRequest request) {
-        log.info("Checking permission for user: {} on resource: {} with action: {}", 
-                request.getUser_uuid(), request.getResource(), request.getAction());
+        log.info("Checking permission for resource: {} with action: {}", 
+                request.getResource(), request.getAction());
         
         return webClient.post()
                 .uri("/permission/check")
@@ -219,8 +218,6 @@ public class RolesServiceClientImpl implements RolesServiceClient {
     @Override
     public Mono<Boolean> hasPermission(String userUuid, String organizationUuid, String resource, String action) {
         PermissionCheckRequest request = PermissionCheckRequest.builder()
-                .user_uuid(userUuid)
-                .organization_uuid(organizationUuid)
                 .resource(resource)
                 .action(action)
                 .build();
@@ -228,5 +225,21 @@ public class RolesServiceClientImpl implements RolesServiceClient {
         return checkPermission(request)
                 .map(PermissionCheckResponse::getHas_permission)
                 .defaultIfEmpty(false);
+    }
+
+    @Override
+    public Mono<ListRolesResponse> filterRoles(ListRolesRequest request, String organizationUuid) {
+        log.info("Filtering roles for organization: {} with criteria: {}", organizationUuid, request);
+        
+        return webClient.post()
+                .uri("/role/filter")
+                .header("x-app-org-uuid", organizationUuid)
+                .header("x-app-user-uuid", "system-user")
+                .bodyValue(request)
+                .retrieve()
+                .bodyToMono(ListRolesResponse.class)
+                .doOnSuccess(response -> log.info("Retrieved {} roles for organization: {}", 
+                        response.getTotalElements(), organizationUuid))
+                .doOnError(error -> log.error("Failed to filter roles: {}", error.getMessage()));
     }
 }
