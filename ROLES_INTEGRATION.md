@@ -43,14 +43,16 @@ All communication with the Roles Service uses dedicated DTOs in the `com.userapi
 
 ### Roles Management
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/roles` | Create a new role |
-| GET | `/api/v1/roles/{roleUuid}` | Get role by UUID |
-| GET | `/api/v1/roles/organization/{orgUuid}` | Get organization roles |
-| GET | `/api/v1/roles/system-managed` | Get system managed roles |
-| PUT | `/api/v1/roles/{roleUuid}` | Update role |
-| DELETE | `/api/v1/roles/{roleUuid}` | Delete role |
+| Method | Endpoint | Description | Status |
+|--------|----------|-------------|---------|
+| POST | `/api/v1/roles` | Create a new role | ✅ Active |
+| GET | `/api/v1/roles/{roleUuid}` | Get role by UUID | ✅ Active |
+| **POST** | **`/api/v1/roles/search`** | **Search and filter roles (NEW)** | ✅ **Recommended** |
+| GET | `/api/v1/roles/organization/{orgUuid}` | Get organization roles | ❌ Removed |
+| GET | `/api/v1/roles/system-managed` | Get system managed roles | ❌ Removed |
+| GET | `/api/v1/roles/user/{userUuid}` | Get user roles | ❌ Removed |
+| PUT | `/api/v1/roles/{roleUuid}` | Update role | ✅ Active |
+| DELETE | `/api/v1/roles/{roleUuid}` | Delete role | ✅ Active |
 
 ### User Role Management
 
@@ -65,6 +67,253 @@ All communication with the Roles Service uses dedicated DTOs in the `com.userapi
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/v1/roles/permissions/check` | Check user permission |
+
+## New Search Endpoint
+
+### POST `/api/v1/roles/search`
+
+The new unified search endpoint replaces the separate organization and system-managed role endpoints with a flexible filtering system.
+
+#### Request Body:
+```json
+{
+  "filterCriteria": {
+    "attributes": [
+      {
+        "name": "role_management_type",
+        "values": ["SYSTEM_MANAGED"]
+      },
+      {
+        "name": "role_name",
+        "values": ["Admin", "User"]
+      }
+    ]
+  },
+  "page": 0,
+  "size": 10,
+  "sortBy": "roleName",
+  "sortDirection": "asc"
+}
+```
+
+#### Response:
+```json
+{
+  "roles": [...],
+  "totalElements": 25,
+  "totalPages": 3,
+  "currentPage": 0,
+  "pageSize": 10,
+  "hasNext": true,
+  "hasPrevious": false
+}
+```
+
+#### Migration Guide:
+
+**Old way:**
+```bash
+GET /role/organization/{orgUuid}
+GET /role/system-managed
+```
+
+**New way:**
+```bash
+# Get organization roles
+POST /role/search
+{
+  "page": 0,
+  "size": 10
+}
+
+# Get system-managed roles (global roles available to all organizations)
+POST /role/search
+{
+  "filterCriteria": {
+    "attributes": [
+      {
+        "name": "role_management_type",
+        "values": ["SYSTEM_MANAGED"]
+      }
+    ]
+  }
+}
+
+# Get customer-managed roles for specific organization
+POST /role/search
+{
+  "filterCriteria": {
+    "attributes": [
+      {
+        "name": "role_management_type",
+        "values": ["CUSTOMER_MANAGED"]
+      },
+      {
+        "name": "organization_uuid",
+        "values": ["cts"]
+      }
+    ]
+  }
+}
+
+# Get all roles for an organization (default behavior)
+POST /role/search
+{
+  "filterCriteria": {
+    "attributes": [
+      {
+        "name": "organization_uuid",
+        "values": ["cts"]
+      }
+    ]
+  }
+}
+
+# Get roles assigned to a specific user
+POST /role/search
+{
+  "filterCriteria": {
+    "attributes": [
+      {
+        "name": "user_uuid",
+        "values": ["42388507-ec8f-47ef-a7c7-8ddb69763ac6"]
+      }
+    ]
+  }
+}
+```
+
+## Migration Guide
+
+### From Legacy Endpoints to Unified Search
+
+#### 1. **Organization Roles**
+```http
+# OLD (Deprecated)
+GET /role/organization/{organizationUuid}
+
+# NEW (Recommended)
+POST /role/search
+{
+  "filterCriteria": {
+    "attributes": [
+      {
+        "name": "role_management_type",
+        "values": ["CUSTOMER_MANAGED"]
+      },
+      {
+        "name": "organization_uuid",
+        "values": ["{organizationUuid}"]
+      }
+    ]
+  }
+}
+```
+
+#### 2. **System-Managed Roles**
+```http
+# OLD (Deprecated)
+GET /role/system-managed
+
+# NEW (Recommended)
+POST /role/search
+{
+  "filterCriteria": {
+    "attributes": [
+      {
+        "name": "role_management_type",
+        "values": ["SYSTEM_MANAGED"]
+      }
+    ]
+  }
+}
+```
+
+#### 3. **User Roles**
+```http
+# OLD (Deprecated)
+GET /role/user/{userUuid}
+
+# NEW (Recommended)
+POST /role/search
+{
+  "filterCriteria": {
+    "attributes": [
+      {
+        "name": "user_uuid",
+        "values": ["{userUuid}"]
+      }
+    ]
+  }
+}
+```
+
+**✅ User Roles Search**: The search API now supports user role queries using the legacy `getUserRoles` method. When filtering by `user_uuid`, the system will:
+1. Call the external service's user roles endpoint directly
+2. Return the roles assigned to the specified user
+3. Handle errors gracefully by returning empty list if the endpoint fails
+4. This approach uses the original method that was working before
+
+### Current Limitations
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **User Role Queries** | ✅ Supported (Alternative) | Uses permission-based filtering |
+| **Organization Role Queries** | ✅ Supported | Works correctly |
+| **System-Managed Role Queries** | ✅ Supported | Works correctly |
+| **Role Assignment** | ✅ Supported | Can assign roles to users |
+| **Role Creation/Update/Delete** | ✅ Supported | Full CRUD operations |
+
+### How User Role Queries Work
+
+The user role search uses the legacy `getUserRoles` method:
+
+1. **Direct API Call**: Calls the external service's user roles endpoint directly
+2. **Role Assignment**: Returns roles that are actually assigned to the user
+3. **Error Handling**: If the external service fails, returns empty list gracefully
+4. **Simple Approach**: Uses the original method that was working before the changes
+5. **Reliable**: Leverages the existing working endpoint instead of complex workarounds
+
+## Role Update Restrictions
+
+### ✅ **ALLOWED to Update:**
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| **`description`** | Role description | "Updated role description" |
+| **`policy`** | Permissions and features | Update JSON policy object |
+| **`is_active`** | Enable/disable role | `true` or `false` |
+
+### ❌ **NOT ALLOWED to Update:**
+
+| Field | Reason | Impact if Changed |
+|-------|--------|-------------------|
+| **`role_name`** | Unique identifier | Breaks role references |
+| **`role_uuid`** | System-generated ID | Breaks all relationships |
+| **`organization_uuid`** | Ownership boundary | Security risk |
+| **`role_management_type`** | System vs Customer scope | Changes role scope |
+| **`created_at`** | Audit trail | Breaks audit history |
+| **`created_by`** | Audit trail | Breaks audit history |
+| **`updated_at`** | System-managed | Auto-generated timestamp |
+
+### Example Update Request:
+
+```json
+PUT /role/{roleUuid}
+{
+  "description": "Updated role description",
+  "policy": {
+    "data": {
+      "read": ["users", "roles"],
+      "write": ["users"]
+    },
+    "features": {
+      "execute": ["view_reports"]
+    }
+  },
+  "is_active": true
+}
+```
 
 ## Configuration
 

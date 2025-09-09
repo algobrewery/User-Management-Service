@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.userapi.models.entity.UserProfile;
 import com.userapi.models.external.roles.CreateRoleRequest;
+import com.userapi.models.external.roles.ListRolesFilterCriteria;
+import com.userapi.models.external.roles.ListRolesFilterCriteriaAttribute;
+import com.userapi.models.external.roles.ListRolesRequest;
 import com.userapi.models.external.roles.RoleResponse;
 import com.userapi.repository.userprofile.UserProfileRepository;
 import com.userapi.service.RolesServiceClient;
@@ -106,9 +109,20 @@ public class UserRolesIntegrationServiceImpl implements UserRolesIntegrationServ
         log.info("Assigning admin role to user: {} in organization: {}", userUuid, organizationUuid);
 
         // First, try to get the admin role from organization-specific roles
-        return rolesServiceClient.getOrganizationRoles(organizationUuid)
-                .flatMap(orgRoles -> {
-                    RoleResponse adminRole = orgRoles.stream()
+        ListRolesRequest orgRequest = ListRolesRequest.builder()
+                .filterCriteria(ListRolesFilterCriteria.builder()
+                        .attributes(List.of(
+                                ListRolesFilterCriteriaAttribute.builder()
+                                        .name("role_management_type")
+                                        .values(List.of("CUSTOMER_MANAGED"))
+                                        .build()
+                        ))
+                        .build())
+                .build();
+        
+        return rolesServiceClient.searchRoles(orgRequest, organizationUuid)
+                .flatMap(orgResponse -> {
+                    RoleResponse adminRole = orgResponse.getRoles().stream()
                             .filter(role -> "Admin".equals(role.getName()))
                             .findFirst()
                             .orElse(null);
@@ -120,14 +134,25 @@ public class UserRolesIntegrationServiceImpl implements UserRolesIntegrationServ
 
                     // If no organization-specific admin role found, try system-managed roles
                     log.info("No organization-specific admin role found, checking system-managed roles");
-                    return rolesServiceClient.getSystemManagedRoles()
-                            .flatMap(systemRoles -> {
+                    ListRolesRequest systemRequest = ListRolesRequest.builder()
+                            .filterCriteria(ListRolesFilterCriteria.builder()
+                                    .attributes(List.of(
+                                            ListRolesFilterCriteriaAttribute.builder()
+                                                    .name("role_management_type")
+                                                    .values(List.of("SYSTEM_MANAGED"))
+                                                    .build()
+                                    ))
+                                    .build())
+                            .build();
+                    
+                    return rolesServiceClient.searchRoles(systemRequest, organizationUuid)
+                            .flatMap(systemResponse -> {
                                 // Log all available system roles for debugging
                                 log.info("Available system-managed roles:");
-                                systemRoles.forEach(role -> log.info("  - Role: '{}' (UUID: {})", role.getName(), role.getRole_uuid()));
+                                systemResponse.getRoles().forEach(role -> log.info("  - Role: '{}' (UUID: {})", role.getName(), role.getRole_uuid()));
 
                                 // Try to find admin role with different possible names
-                                RoleResponse systemAdminRole = systemRoles.stream()
+                                RoleResponse systemAdminRole = systemResponse.getRoles().stream()
                                         .filter(role -> {
                                             String roleName = role.getName();
                                             return roleName != null && (
@@ -145,7 +170,7 @@ public class UserRolesIntegrationServiceImpl implements UserRolesIntegrationServ
 
                                 if (systemAdminRole == null) {
                                     log.error("Admin role not found in organization or system-managed roles. Available roles: {}", 
-                                            systemRoles.stream().map(RoleResponse::getName).toList());
+                                            systemResponse.getRoles().stream().map(RoleResponse::getName).toList());
                                     return Mono.error(new RuntimeException("Admin role not found"));
                                 }
 
@@ -162,9 +187,20 @@ public class UserRolesIntegrationServiceImpl implements UserRolesIntegrationServ
         log.info("Assigning user role to user: {} in organization: {}", userUuid, organizationUuid);
         
         // First, get the user role for the organization
-        return rolesServiceClient.getOrganizationRoles(organizationUuid)
-                .flatMap(roles -> {
-                    RoleResponse userRole = roles.stream()
+        ListRolesRequest userRequest = ListRolesRequest.builder()
+                .filterCriteria(ListRolesFilterCriteria.builder()
+                        .attributes(List.of(
+                                ListRolesFilterCriteriaAttribute.builder()
+                                        .name("role_management_type")
+                                        .values(List.of("CUSTOMER_MANAGED"))
+                                        .build()
+                        ))
+                        .build())
+                .build();
+        
+        return rolesServiceClient.searchRoles(userRequest, organizationUuid)
+                .flatMap(response -> {
+                    RoleResponse userRole = response.getRoles().stream()
                             .filter(role -> "User".equals(role.getName()))
                             .findFirst()
                             .orElse(null);
@@ -184,7 +220,19 @@ public class UserRolesIntegrationServiceImpl implements UserRolesIntegrationServ
     public Mono<List<RoleResponse>> getUserRoles(String userUuid, String organizationUuid) {
         log.info("Getting roles for user: {} in organization: {}", userUuid, organizationUuid);
         
-        return rolesServiceClient.getUserRoles(userUuid, organizationUuid)
+        ListRolesRequest request = ListRolesRequest.builder()
+                .filterCriteria(ListRolesFilterCriteria.builder()
+                        .attributes(List.of(
+                                ListRolesFilterCriteriaAttribute.builder()
+                                        .name("user_uuid")
+                                        .values(List.of(userUuid))
+                                        .build()
+                        ))
+                        .build())
+                .build();
+        
+        return rolesServiceClient.searchRoles(request, organizationUuid)
+                .map(response -> response.getRoles())
                 .doOnSuccess(roles -> log.info("Retrieved {} roles for user: {}", roles.size(), userUuid))
                 .doOnError(error -> log.error("Failed to get user roles: {}", error.getMessage()));
     }
