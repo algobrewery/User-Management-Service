@@ -46,16 +46,13 @@ class RolesServiceClientTest {
 
     @Test
     void testPermissionCheckRequestBuilder() {
-        // Test the permission check DTO builder
+        // Test the permission check DTO builder (header-based approach)
         PermissionCheckRequest request = PermissionCheckRequest.builder()
-                .user_uuid("user-uuid")
-                .organization_uuid("org-uuid")
                 .resource("users")
                 .action("read")
                 .build();
 
-        assert request.getUser_uuid().equals("user-uuid");
-        assert request.getOrganization_uuid().equals("org-uuid");
+        // Note: user_uuid and organization_uuid are now provided via headers, not in request body
         assert request.getResource().equals("users");
         assert request.getAction().equals("read");
     }
