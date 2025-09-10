@@ -10,8 +10,7 @@ import javax.validation.constraints.NotBlank;
 
 /**
  * Request model for assigning roles to users.
- * Note: The external Roles and Permissions Service requires organization_uuid in the request body
- * even though we also send it via x-app-org-uuid header for consistency.
+ * Organization context is provided via x-app-org-uuid header, not in request body.
  */
 @Data
 @NoArgsConstructor
@@ -21,7 +20,7 @@ import javax.validation.constraints.NotBlank;
 public class AssignRoleRequest {
     @NotBlank(message = "Role UUID is required")
     private String role_uuid;
-
-    @NotBlank(message = "Organization UUID is required")
-    private String organization_uuid;
+    
+    // organization_uuid removed - now comes from x-app-org-uuid header
+    // This matches the updated Roles and Permissions Service implementation
 }

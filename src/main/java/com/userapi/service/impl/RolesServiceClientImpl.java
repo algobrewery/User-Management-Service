@@ -36,6 +36,7 @@ public class RolesServiceClientImpl implements RolesServiceClient {
 
         return webClient.post()
                 .uri("/role")
+                .header("x-app-org-uuid", organizationUuid) // Organization context via header
                 .header("x-app-user-uuid", "system-user") // GitHub service expects this header
                 .bodyValue(request)
                 .retrieve()
@@ -174,16 +175,14 @@ public class RolesServiceClientImpl implements RolesServiceClient {
     public Mono<Void> assignRoleToUser(String userUuid, String roleUuid, String organizationUuid) {
         log.info("Assigning role: {} to user: {} in organization: {}", roleUuid, userUuid, organizationUuid);
 
-        // Create request with both role_uuid and organization_uuid
-        // The external Roles service requires organization_uuid in the request body
+        // Create request with only role_uuid - organization context comes from headers
         AssignRoleRequest request = AssignRoleRequest.builder()
                 .role_uuid(roleUuid)
-                .organization_uuid(organizationUuid)
                 .build();
 
         return webClient.post()
                 .uri("/user/{userUuid}/roles", userUuid)
-                .header("x-app-org-uuid", organizationUuid) // Also send via header for consistency
+                .header("x-app-org-uuid", organizationUuid) // Organization context via header
                 .header("x-app-user-uuid", "system-user") // GitHub service expects this header
                 .bodyValue(request)
                 .retrieve()
@@ -239,8 +238,8 @@ public class RolesServiceClientImpl implements RolesServiceClient {
 
     @Override
     public Mono<PermissionCheckResponse> checkPermission(PermissionCheckRequest request) {
-        log.info("Checking permission for user: {} on resource: {} with action: {}", 
-                request.getUser_uuid(), request.getResource(), request.getAction());
+        log.info("Checking permission for resource: {} with action: {}", 
+                request.getResource(), request.getAction());
         
         return webClient.post()
                 .uri("/permission/check")
@@ -254,15 +253,23 @@ public class RolesServiceClientImpl implements RolesServiceClient {
     @Override
     public Mono<Boolean> hasPermission(String userUuid, String organizationUuid, String resource, String action) {
         PermissionCheckRequest request = PermissionCheckRequest.builder()
-                .user_uuid(userUuid)
-                .organization_uuid(organizationUuid)
                 .resource(resource)
                 .action(action)
                 .build();
         
-        return checkPermission(request)
+        return webClient.post()
+                .uri("/permission/check")
+                .header("x-app-user-uuid", userUuid) // User context via header
+                .header("x-app-org-uuid", organizationUuid) // Organization context via header
+                .bodyValue(request)
+                .retrieve()
+                .bodyToMono(PermissionCheckResponse.class)
                 .map(PermissionCheckResponse::getHas_permission)
-                .defaultIfEmpty(false);
+                .defaultIfEmpty(false)
+                .doOnSuccess(result -> log.info("Permission check result: {} for user: {} on resource: {} with action: {}", 
+                        result, userUuid, resource, action))
+                .doOnError(error -> log.error("Failed to check permission for user: {} on resource: {} with action: {} - {}", 
+                        userUuid, resource, action, error.getMessage()));
     }
 
     @Override

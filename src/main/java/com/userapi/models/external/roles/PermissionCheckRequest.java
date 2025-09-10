@@ -1,5 +1,6 @@
 package com.userapi.models.external.roles;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -7,17 +8,19 @@ import lombok.NoArgsConstructor;
 
 import javax.validation.constraints.NotBlank;
 
+/**
+ * Request model for checking user permissions.
+ * User and organization context are provided via headers, not in request body.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class PermissionCheckRequest {
-    @NotBlank(message = "User UUID is required")
-    private String user_uuid;
-
-    @NotBlank(message = "Organization UUID is required")
-    private String organization_uuid;
-
+    // user_uuid removed - now comes from x-app-user-uuid header
+    // organization_uuid removed - now comes from x-app-org-uuid header
+    
     @NotBlank(message = "Resource is required")
     private String resource;
 

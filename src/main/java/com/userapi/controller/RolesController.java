@@ -209,19 +209,30 @@ public class RolesController {
     @PostMapping("/permissions/check")
     // @PreAuthorize("hasPermission('PERMISSION', 'CHECK')") // REMOVED - Circular dependency issue
     public Mono<ResponseEntity<PermissionCheckResponse>> checkPermission(
-            @Valid @RequestBody PermissionCheckRequest request) {
+            @Valid @RequestBody PermissionCheckRequest request,
+            HttpServletRequest httpRequest) {
+
+        // Validate required headers
+        HeaderValidationUtil.validateRequiredHeaders(httpRequest);
+        
+        String userUuid = HeaderValidationUtil.getValidatedUserUuid(httpRequest);
+        String organizationUuid = HeaderValidationUtil.getValidatedOrganizationUuid(httpRequest);
 
         log.info("Checking permission for user: {} on resource: {} with action: {}", 
-                request.getUser_uuid(), request.getResource(), request.getAction());
+                userUuid, request.getResource(), request.getAction());
 
-        return rolesServiceClient.checkPermission(request)
-                .map(response -> {
+        return rolesServiceClient.hasPermission(userUuid, organizationUuid, request.getResource(), request.getAction())
+                .map(hasPermission -> {
+                    PermissionCheckResponse response = PermissionCheckResponse.builder()
+                            .has_permission(hasPermission)
+                            .build();
+                    
                     log.info("Permission check result: {} for user: {} on resource: {} with action: {}", 
-                            response.getHas_permission(), request.getUser_uuid(), request.getResource(), request.getAction());
+                            hasPermission, userUuid, request.getResource(), request.getAction());
                     return ResponseEntity.ok(response);
                 })
                 .onErrorResume(error -> RolesServiceExceptionHandler.handlePermissionCheckError(
-                        request.getUser_uuid(), request.getResource(), request.getAction(), error));
+                        userUuid, request.getResource(), request.getAction(), error));
     }
 
     @PostMapping("/user/{userUuid}/assign-admin")
