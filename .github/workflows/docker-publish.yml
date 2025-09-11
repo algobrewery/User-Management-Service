@@ -79,7 +79,7 @@ jobs:
     if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     env:
-      ROLE_ARN: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_ARN }}
+      ROLE_ARN: arn:aws:iam::624160185248:role/github-actions-ecs-deployer
       AWS_REGION_FALLBACK: ${{ vars.AWS_REGION || secrets.AWS_REGION || 'us-east-1' }}
 
     steps:
@@ -97,7 +97,7 @@ jobs:
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.ROLE_ARN }}
+          role-to-assume: arn:aws:iam::624160185248:role/github-actions-ecs-deployer
           aws-region: ${{ env.AWS_REGION_FALLBACK }}
           audience: sts.amazonaws.com
           output-env-credentials: true
