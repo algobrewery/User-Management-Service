@@ -1,18 +1,18 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Deploy User Management Service on ECS Fargate with ALB and API Gateway - PRODUCTION Environment
+Description: Deploy User Management Service on ECS Fargate with ALB and API Gateway - TEST Environment
 
 Parameters:
   VpcCidr:
     Type: String
-    Default: 10.0.0.0/16
+    Default: 10.1.0.0/16
     Description: CIDR block for the VPC
   PublicSubnet1Cidr:
     Type: String
-    Default: 10.0.1.0/24
+    Default: 10.1.1.0/24
     Description: CIDR block for the first public subnet
   PublicSubnet2Cidr:
     Type: String
-    Default: 10.0.2.0/24
+    Default: 10.1.2.0/24
     Description: CIDR block for the second public subnet
   ContainerPort:
     Type: Number
@@ -24,11 +24,11 @@ Parameters:
     Description: Desired number of tasks in the ECS service
   ImageUrl:
     Type: String
-    Default: sindhu030/user_role_production:latest
+    Default: sindhu030/user_role_production:test-latest
     Description: Docker image URL for the User Management Service
   DBHost:
     Type: String
-    Default: nucleus-production.c6j42qq2krlk.us-east-1.rds.amazonaws.com
+    Default: nucleus-staging.c6j42qq2krlk.us-east-1.rds.amazonaws.com
     Description: RDS database endpoint
   DBName:
     Type: String
@@ -40,17 +40,17 @@ Parameters:
     Description: Database username
   DBPassword:
     Type: String
-    Default: nucleus-production
+    Default: nucleus-staging
     NoEcho: true
     Description: Database password
   ClientManagementServiceUrl:
     Type: String
-    Default: https://qokdavzgh7.execute-api.us-east-1.amazonaws.com/prod
+    Default: https://test-api.execute-api.us-east-1.amazonaws.com/test
     Description: Client Management Service URL
   Environment:
     Type: String
-    Default: production
-    AllowedValues: [production]
+    Default: test
+    AllowedValues: [test]
     Description: Environment name
 
 Resources:
@@ -196,23 +196,21 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/ecs/${Environment}-user-management-service'
-      RetentionInDays: 30
+      RetentionInDays: 7
 
   AppTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: !Sub '${Environment}-user-management-task'
-      Cpu: '1024'
-      Memory: '2048'
+      Cpu: '512'
+      Memory: '1024'
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
-      # Force new revision to pull updated image
       Tags:
-        - Key: ImageVersion
-          Value: 'java17-fix-v4-no-health-check'
-      # Add a comment to force new revision
+        - Key: Environment
+          Value: test
       ContainerDefinitions:
         - Name: user-management-service
           Image: !Ref ImageUrl
@@ -221,7 +219,7 @@ Resources:
               Protocol: tcp
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
-              Value: prod
+              Value: test
             - Name: SPRING_DATASOURCE_URL
               Value: !Sub 'jdbc:postgresql://${DBHost}:5432/${DBName}'
             - Name: SPRING_DATASOURCE_USERNAME
@@ -238,7 +236,6 @@ Resources:
               awslogs-group: !Ref UserManagementLogGroup
               awslogs-region: !Ref "AWS::Region"
               awslogs-stream-prefix: ecs
-          # Health check removed - ALB will handle health checks
 
   AppALB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -309,7 +306,7 @@ Resources:
     Properties:
       Name: !Sub '${Environment}-user-management-api'
       ProtocolType: HTTP
-      Description: API Gateway for User Management Service
+      Description: API Gateway for User Management Service - Test Environment
 
   ApiGatewayIntegrationClean:
     Type: AWS::ApiGatewayV2::Integration
@@ -333,13 +330,19 @@ Resources:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
       ApiId: !Ref ApiGateway
-      StageName: prod
+      StageName: test
       AutoDeploy: true
 
 Outputs:
   ApiEndpoint:
     Description: 'API Gateway endpoint URL'
-    Value: !Sub 'https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/'
+    Value: !Sub 'https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/test/'
   ALBEndpoint:
     Description: 'Application Load Balancer DNS Name'
     Value: !GetAtt AppALB.DNSName
+  ECSCluster:
+    Description: 'ECS Cluster Name'
+    Value: !Ref UserManagementCluster
+  ECSService:
+    Description: 'ECS Service Name'
+    Value: !Ref AppService

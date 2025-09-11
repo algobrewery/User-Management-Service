@@ -1,0 +1,364 @@
+name: CI/CD Pipeline - User Management Service
+
+on:
+  push:
+    branches: [ "main", "master", "user-roles" ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ "main", "master", "user-roles" ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+        - test
+        - production
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  DOCKER_REGISTRY: docker.io
+  IMAGE_NAME: sindhu030/user_role_production
+  AWS_REGION: us-east-1
+
+jobs:
+  # Stage 1: Unit Tests
+  unit-tests:
+    runs-on: ubuntu-latest
+    name: Unit Tests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x ./gradlew
+
+      - name: Run Unit Tests
+        run: |
+          ./gradlew clean test --info
+        env:
+          SPRING_PROFILES_ACTIVE: test
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: build/test-results/test/
+
+  # Stage 2: Build and Push Docker Image
+  build-and-push:
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    name: Build and Push Docker Image
+    if: github.event_name != 'pull_request'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x ./gradlew
+
+      - name: Build JAR
+        run: ./gradlew clean bootJar
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+            type=raw,value=user-roles,enable=${{ github.ref == 'refs/heads/user-roles' }}
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,prefix={{branch}}-
+            type=raw,value=test-{{sha}},enable=${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' && github.ref != 'refs/heads/user-roles' }}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Stage 3: Deploy to Test Environment
+  deploy-test:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    name: Deploy to Test Environment
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/user-roles' || github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master')
+    environment: test
+    env:
+      ROLE_ARN: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_ARN }}
+      ECS_CLUSTER: test-user-management-cluster
+      ECS_SERVICE: test-user-management-service
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Precheck role ARN
+        run: |
+          if [ -z "${ROLE_ARN}" ]; then
+            echo "AWS role ARN not set. Define repo variable 'AWS_ROLE_TO_ASSUME' or secret 'AWS_ROLE_TO_ASSUME' (or 'AWS_ROLE_ARN')." >&2
+            exit 1
+          fi
+          echo "Using role: ${ROLE_ARN}"
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Update ECS service with new image
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.ECS_SERVICE }} \
+            --force-new-deployment
+
+      - name: Wait for ECS deployment to complete
+        run: |
+          echo "Waiting for test deployment to complete..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }}
+          echo "Test deployment completed successfully!"
+
+  # Stage 4: Health Check on Test Environment
+  health-check-test:
+    needs: deploy-test
+    runs-on: ubuntu-latest
+    name: Health Check - Test Environment
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/user-roles' || github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run Health Check on Test Environment
+        run: |
+          echo "Running health check on test environment..."
+          pwsh ./health-check-enhanced.ps1 -Environment test
+        env:
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+
+  # Stage 5: Integration Tests on Test Environment
+  integration-tests:
+    needs: health-check-test
+    runs-on: ubuntu-latest
+    name: Integration Tests - Test Environment
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/user-roles' || github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x ./gradlew
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get Test Environment API Gateway URL
+        id: get-test-url
+        run: |
+          API_URL=$(aws apigatewayv2 get-apis --query 'Items[?Name==`test-user-management-api`].ApiEndpoint' --output text)
+          echo "api-url=$API_URL" >> $GITHUB_OUTPUT
+          echo "Test API URL: $API_URL"
+
+      - name: Run Integration Tests
+        run: |
+          ./gradlew integrationTest -Dspring.profiles.active=ci -Dtest.api.url=${{ steps.get-test-url.outputs.api-url }}
+        env:
+          CI: true
+          SPRING_PROFILES_ACTIVE: ci
+          TEST_API_URL: ${{ steps.get-test-url.outputs.api-url }}
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: build/test-results/integrationTest/
+
+  # Stage 6: Deploy to Production Environment
+  deploy-production:
+    needs: [build-and-push, integration-tests]
+    runs-on: ubuntu-latest
+    name: Deploy to Production Environment
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/user-roles' || github.event_name == 'workflow_dispatch')
+    environment: production
+    env:
+      ROLE_ARN: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_ARN }}
+      ECS_CLUSTER: production-user-management-cluster
+      ECS_SERVICE: production-user-management-service
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Precheck role ARN
+        run: |
+          if [ -z "${ROLE_ARN}" ]; then
+            echo "AWS role ARN not set. Define repo variable 'AWS_ROLE_TO_ASSUME' or secret 'AWS_ROLE_TO_ASSUME' (or 'AWS_ROLE_ARN')." >&2
+            exit 1
+          fi
+          echo "Using role: ${ROLE_ARN}"
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Run Pre-deployment Health Check
+        run: |
+          echo "Running pre-deployment health check..."
+          pwsh ./health-check-enhanced.ps1 -Environment production
+        env:
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+
+      - name: Deploy to Production ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.ECS_SERVICE }} \
+            --force-new-deployment
+
+      - name: Wait for Production deployment to complete
+        run: |
+          echo "Waiting for production deployment to complete..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }}
+          echo "Production deployment completed successfully!"
+
+  # Stage 7: Post-deployment Health Check and Integration Tests
+  post-deployment-tests:
+    needs: deploy-production
+    runs-on: ubuntu-latest
+    name: Post-deployment Tests - Production
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/user-roles' || github.event_name == 'workflow_dispatch')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x ./gradlew
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get Production API Gateway URL
+        id: get-prod-url
+        run: |
+          API_URL=$(aws apigatewayv2 get-apis --query 'Items[?Name==`production-user-management-api`].ApiEndpoint' --output text)
+          echo "api-url=$API_URL" >> $GITHUB_OUTPUT
+          echo "Production API URL: $API_URL"
+
+      - name: Run Post-deployment Health Check
+        run: |
+          echo "Running post-deployment health check..."
+          pwsh ./health-check-enhanced.ps1 -Environment production
+        env:
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+
+      - name: Run Smoke Tests on Production
+        run: |
+          ./gradlew integrationTest -Dspring.profiles.active=ci -Dtest.api.url=${{ steps.get-prod-url.outputs.api-url }} -Dtest.smoke=true
+        env:
+          CI: true
+          SPRING_PROFILES_ACTIVE: ci
+          TEST_API_URL: ${{ steps.get-prod-url.outputs.api-url }}
+
+      - name: Upload production test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-test-results
+          path: build/test-results/integrationTest/
+
+  # Stage 8: Notification
+  notify:
+    needs: [unit-tests, build-and-push, deploy-test, health-check-test, integration-tests, deploy-production, post-deployment-tests]
+    runs-on: ubuntu-latest
+    name: Send Notifications
+    if: always()
+    steps:
+      - name: Notify Success
+        if: ${{ needs.deploy-production.result == 'success' }}
+        run: |
+          echo "✅ Production deployment successful!"
+          echo "Image: ${{ needs.build-and-push.outputs.image-tag }}"
+          echo "Digest: ${{ needs.build-and-push.outputs.image-digest }}"
+
+      - name: Notify Failure
+        if: ${{ needs.deploy-production.result == 'failure' }}
+        run: |
+          echo "❌ Production deployment failed!"
+          echo "Check the logs for details."
