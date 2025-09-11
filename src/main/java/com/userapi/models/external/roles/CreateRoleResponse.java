@@ -1,11 +1,10 @@
 package com.userapi.models.external.roles;
 
+import com.userapi.enums.RoleStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
@@ -20,7 +19,7 @@ public class CreateRoleResponse {
     private String message;
     private String status;
     private String organization_uuid;
-    private Boolean is_active;
+    private RoleStatus roleStatus;
     private String created_by;
     private String created_at;  // Changed to String to handle different date formats
     
@@ -30,7 +29,7 @@ public class CreateRoleResponse {
     }
     
     public boolean isActive() {
-        return is_active != null ? is_active : true;
+        return roleStatus != null ? roleStatus == RoleStatus.ACTIVE : true;
     }
     
     public String getCreatedBy() {

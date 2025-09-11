@@ -6,7 +6,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.servlet.http.HttpServletRequest;
-import java.util.UUID;
 
 /**
  * Utility class for validating HTTP headers in controller endpoints.
@@ -81,70 +80,6 @@ public class HeaderValidationUtil {
         }
         
         log.debug("User identifier validated: {}", userUuid);
-    }
-    
-    /**
-     * Validates that a string is a valid UUID format
-     * @param uuid the string to validate
-     * @return true if valid UUID format, false otherwise
-     */
-    private static boolean isValidUuid(String uuid) {
-        if (uuid == null || uuid.trim().isEmpty()) {
-            return false;
-        }
-        
-        try {
-            UUID.fromString(uuid.trim());
-            return true;
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
-    }
-    
-    /**
-     * Strict UUID validation for production scenarios
-     * @param organizationUuid the organization UUID to validate
-     * @throws ResponseStatusException if validation fails
-     */
-    public static void validateOrganizationUuidStrict(String organizationUuid) {
-        if (organizationUuid == null || organizationUuid.trim().isEmpty()) {
-            log.error("Missing required header: {}", HeaderConstants.APP_ORG_UUID);
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST, 
-                "Missing required header: " + HeaderConstants.APP_ORG_UUID
-            );
-        }
-        
-        if (!isValidUuid(organizationUuid)) {
-            log.error("Invalid UUID format for organization: {}", organizationUuid);
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST, 
-                "Invalid UUID format for organization: " + organizationUuid
-            );
-        }
-    }
-    
-    /**
-     * Strict UUID validation for production scenarios
-     * @param userUuid the user UUID to validate
-     * @throws ResponseStatusException if validation fails
-     */
-    public static void validateUserUuidStrict(String userUuid) {
-        if (userUuid == null || userUuid.trim().isEmpty()) {
-            log.error("Missing required header: {}", HeaderConstants.APP_USER_UUID);
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST, 
-                "Missing required header: " + HeaderConstants.APP_USER_UUID
-            );
-        }
-        
-        if (!isValidUuid(userUuid)) {
-            log.error("Invalid UUID format for user: {}", userUuid);
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST, 
-                "Invalid UUID format for user: " + userUuid
-            );
-        }
     }
     
     /**

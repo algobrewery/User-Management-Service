@@ -1,5 +1,6 @@
 package com.userapi.models.external.roles;
 
+import com.userapi.enums.PermissionResult;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,7 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class PermissionCheckResponse {
-    private Boolean has_permission;
+    private PermissionResult result;
     private String message;
     private String resource;
     private String action;

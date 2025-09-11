@@ -1,5 +1,7 @@
 package com.userapi.controller;
 
+import com.userapi.enums.PermissionResult;
+import com.userapi.enums.ResourceType;
 import com.userapi.exception.RolesServiceExceptionHandler;
 import com.userapi.models.external.roles.*;
 import com.userapi.service.RolesServiceClient;
@@ -38,12 +40,12 @@ public class RolesController {
         String organizationUuid = HeaderValidationUtil.getValidatedOrganizationUuid(httpRequest);
         String userUuid = HeaderValidationUtil.getValidatedUserUuid(httpRequest);
         
-        log.info("Creating role: {} for organization: {} by user: {}", 
-                request.getRoleName(), organizationUuid, userUuid);
+        log.info("Creating role: {} for organization: {} by user: {} on resource: {}", 
+                request.getRoleName(), organizationUuid, userUuid, ResourceType.ROLES.getResourceName());
         
         return rolesServiceClient.createRole(request, organizationUuid)
                 .map(response -> {
-                    log.info("Role created successfully: {} with UUID: {}", response.getName(), response.getRole_uuid());
+                    log.info("Role created successfully: {} with UUID: {}", response.getRoleName(), response.getRole_uuid());
                     return ResponseEntity.status(HttpStatus.CREATED).body(response);
                 })
                 .onErrorResume(error -> RolesServiceExceptionHandler.handleRoleCreationError(
@@ -64,7 +66,7 @@ public class RolesController {
         
         return rolesServiceClient.getRoleByUuid(roleUuid, organizationUuid)
                 .map(response -> {
-                    log.info("Role retrieved successfully: {} with UUID: {}", response.getName(), response.getRole_uuid());
+                    log.info("Role retrieved successfully: {} with UUID: {}", response.getRoleName(), response.getRole_uuid());
                     return ResponseEntity.ok(response);
                 })
                 .onErrorResume(error -> RolesServiceExceptionHandler.handleRoleRetrievalError(
@@ -74,7 +76,6 @@ public class RolesController {
     // ========== NEW UNIFIED SEARCH ENDPOINT ==========
     
     @PostMapping("/search")
-    @PreAuthorize("hasPermission('ROLE', 'READ')")
     public Mono<ResponseEntity<ListRolesResponse>> searchRoles(
             @Valid @RequestBody ListRolesRequest request,
             HttpServletRequest httpRequest) {
@@ -85,8 +86,8 @@ public class RolesController {
         String organizationUuid = HeaderValidationUtil.getValidatedOrganizationUuid(httpRequest);
         String userUuid = HeaderValidationUtil.getValidatedUserUuid(httpRequest);
         
-        log.info("Searching roles for organization: {} by user: {} with filters: {}", 
-                organizationUuid, userUuid, request.getFilterCriteria());
+        log.info("Searching roles for organization: {} by user: {} with filters: {} on resource: {}", 
+                organizationUuid, userUuid, request.getFilterCriteria(), ResourceType.ROLES.getResourceName());
         
         return rolesServiceClient.searchRoles(request, organizationUuid)
                 .map(response -> {
@@ -126,15 +127,15 @@ public class RolesController {
         String organizationUuid = HeaderValidationUtil.getValidatedOrganizationUuid(httpRequest);
         String userUuid = HeaderValidationUtil.getValidatedUserUuid(httpRequest);
         
-        log.info("Updating role: {} for organization: {} by user: {} with fields: {}", 
+        log.info("Updating role: {} for organization: {} by user: {} with fields: {} on resource: {}", 
                 roleUuid, organizationUuid, userUuid, 
                 "description=" + (request.getDescription() != null) + 
                 ", policy=" + (request.getPolicy() != null) + 
-                ", is_active=" + (request.getIs_active() != null));
+                ", status=" + (request.getStatus() != null), ResourceType.ROLES.getResourceName());
         
         return rolesServiceClient.updateRole(roleUuid, request, organizationUuid)
                 .map(response -> {
-                    log.info("Role updated successfully: {} with UUID: {}", response.getName(), response.getRole_uuid());
+                    log.info("Role updated successfully: {} with UUID: {}", response.getRoleName(), response.getRole_uuid());
                     return ResponseEntity.ok(response);
                 })
                 .onErrorResume(error -> RolesServiceExceptionHandler.handleRoleUpdateError(
@@ -153,8 +154,8 @@ public class RolesController {
         String organizationUuid = HeaderValidationUtil.getValidatedOrganizationUuid(httpRequest);
         String userUuid = HeaderValidationUtil.getValidatedUserUuid(httpRequest);
         
-        log.info("Deleting role: {} for organization: {} by user: {}", 
-                roleUuid, organizationUuid, userUuid);
+        log.info("Deleting role: {} for organization: {} by user: {} on resource: {}", 
+                roleUuid, organizationUuid, userUuid, ResourceType.ROLES.getResourceName());
         
         return rolesServiceClient.deleteRole(roleUuid, organizationUuid)
                 .then(Mono.just(ResponseEntity.ok("Role " + roleUuid + " deleted successfully")))
@@ -163,7 +164,7 @@ public class RolesController {
     }
 
     @PostMapping("/user/{userUuid}/assign")
-    // @PreAuthorize("hasPermission('USER_ROLE', 'ASSIGN')")  // DISABLED FOR FINAL BOOTSTRAP
+    // @PreAuthorize("hasPermission('USER_ROLES', 'ASSIGN')")  // DISABLED FOR FINAL BOOTSTRAP
     public Mono<ResponseEntity<String>> assignRoleToUser(
             @PathVariable String userUuid,
             @Valid @RequestBody AssignRoleRequest request,
@@ -175,8 +176,8 @@ public class RolesController {
         String organizationUuid = HeaderValidationUtil.getValidatedOrganizationUuid(httpRequest);
         String assignedBy = HeaderValidationUtil.getValidatedUserUuid(httpRequest);
         
-        log.info("Assigning role: {} to user: {} in organization: {} by user: {}", 
-                request.getRole_uuid(), userUuid, organizationUuid, assignedBy);
+        log.info("Assigning role: {} to user: {} in organization: {} by user: {} on resource: {}", 
+                request.getRole_uuid(), userUuid, organizationUuid, assignedBy, ResourceType.USER_ROLES.getResourceName());
         
         return rolesServiceClient.assignRoleToUser(userUuid, request.getRole_uuid(), organizationUuid)
                 .then(Mono.just(ResponseEntity.ok("Role " + request.getRole_uuid() + " assigned successfully to user: " + userUuid)))
@@ -186,6 +187,7 @@ public class RolesController {
 
 
     @DeleteMapping("/user/{userUuid}/roles/{roleUuid}")
+    @PreAuthorize("hasPermission('USER_ROLES', 'REMOVE')")
     public Mono<ResponseEntity<String>> removeRoleFromUser(
             @PathVariable String userUuid,
             @PathVariable String roleUuid,
@@ -197,8 +199,8 @@ public class RolesController {
         String organizationUuid = HeaderValidationUtil.getValidatedOrganizationUuid(httpRequest);
         String removedBy = HeaderValidationUtil.getValidatedUserUuid(httpRequest);
         
-        log.info("Removing role: {} from user: {} in organization: {} by user: {}", 
-                roleUuid, userUuid, organizationUuid, removedBy);
+        log.info("Removing role: {} from user: {} in organization: {} by user: {} on resource: {}", 
+                roleUuid, userUuid, organizationUuid, removedBy, ResourceType.USER_ROLES.getResourceName());
         
         return rolesServiceClient.removeRoleFromUser(userUuid, roleUuid, organizationUuid)
                 .then(Mono.just(ResponseEntity.ok("Role " + roleUuid + " removed successfully from user " + userUuid)))
@@ -207,7 +209,6 @@ public class RolesController {
     }
 
     @PostMapping("/permissions/check")
-    // @PreAuthorize("hasPermission('PERMISSION', 'CHECK')") // REMOVED - Circular dependency issue
     public Mono<ResponseEntity<PermissionCheckResponse>> checkPermission(
             @Valid @RequestBody PermissionCheckRequest request,
             HttpServletRequest httpRequest) {
@@ -223,12 +224,15 @@ public class RolesController {
 
         return rolesServiceClient.hasPermission(userUuid, organizationUuid, request.getResource(), request.getAction())
                 .map(hasPermission -> {
+                    PermissionResult result = hasPermission ? PermissionResult.ACCEPTED : PermissionResult.DENIED;
                     PermissionCheckResponse response = PermissionCheckResponse.builder()
-                            .has_permission(hasPermission)
+                            .result(result)
+                            .resource(request.getResource())
+                            .action(request.getAction())
                             .build();
                     
                     log.info("Permission check result: {} for user: {} on resource: {} with action: {}", 
-                            hasPermission, userUuid, request.getResource(), request.getAction());
+                            result, userUuid, request.getResource(), request.getAction());
                     return ResponseEntity.ok(response);
                 })
                 .onErrorResume(error -> RolesServiceExceptionHandler.handlePermissionCheckError(
@@ -236,7 +240,7 @@ public class RolesController {
     }
 
     @PostMapping("/user/{userUuid}/assign-admin")
-    // @PreAuthorize("hasPermission('USER_ROLE', 'ASSIGN_ADMIN')")  // DISABLED FOR BOOTSTRAP
+    // @PreAuthorize("hasPermission('USER_ROLES', 'ASSIGN_ADMIN')")  // DISABLED FOR BOOTSTRAP
     public Mono<ResponseEntity<String>> assignAdminRoleToExistingUser(
             @PathVariable String userUuid,
             HttpServletRequest httpRequest) {
@@ -247,8 +251,8 @@ public class RolesController {
         String organizationUuid = HeaderValidationUtil.getValidatedOrganizationUuid(httpRequest);
         String assignedBy = HeaderValidationUtil.getValidatedUserUuid(httpRequest);
 
-        log.info("Assigning admin role to existing user: {} in organization: {} by user: {}", 
-                userUuid, organizationUuid, assignedBy);
+        log.info("Assigning admin role to existing user: {} in organization: {} by user: {} on resource: {}", 
+                userUuid, organizationUuid, assignedBy, ResourceType.USER_ROLES.getResourceName());
 
         return userRolesIntegrationService.checkUserExistsAndAssignAdminRole(userUuid, organizationUuid, assignedBy)
                 .then(Mono.just(ResponseEntity.ok("Admin role assigned successfully to user: " + userUuid)))
@@ -268,7 +272,7 @@ public class RolesController {
     }
 
     @PostMapping("/user/{userUuid}/assign-role/{roleUuid}")
-    // @PreAuthorize("hasPermission('USER_ROLE', 'ASSIGN')")  // DISABLED FOR BOOTSTRAP
+    // @PreAuthorize("hasPermission('USER_ROLES', 'ASSIGN')")  // DISABLED FOR BOOTSTRAP
     public Mono<ResponseEntity<String>> assignRoleByUuidToExistingUser(
             @PathVariable String userUuid,
             @PathVariable String roleUuid,
@@ -304,22 +308,26 @@ public class RolesController {
             @Valid @RequestBody CreateRoleRequest request,
             HttpServletRequest httpRequest) {
 
-        // Validate organization UUID for bootstrap operations
-        HeaderValidationUtil.validateOrganizationUuid(httpRequest.getHeader("x-app-org-uuid"));
+        // Validate required headers for bootstrap operations
+        HeaderValidationUtil.validateRequiredHeaders(httpRequest);
         
         String organizationUuid = HeaderValidationUtil.getValidatedOrganizationUuid(httpRequest);
-        String userUuid = httpRequest.getHeader("x-app-user-uuid"); // Optional for bootstrap
+        String userUuid = HeaderValidationUtil.getValidatedUserUuid(httpRequest);
 
-        log.info("BOOTSTRAP: Creating role: {} for organization: {} by user: {}", 
-                request.getRoleName(), organizationUuid, userUuid);
+        log.info("BOOTSTRAP: Creating role: {} for organization: {} by user: {} on resource: {}", 
+                request.getRoleName(), organizationUuid, userUuid, ResourceType.ROLES.getResourceName());
 
         return rolesServiceClient.createRole(request, organizationUuid)
                 .map(response -> {
-                    log.info("BOOTSTRAP: Role created successfully: {} with UUID: {}", response.getName(), response.getRole_uuid());
+                    log.info("BOOTSTRAP: Role created successfully: {} with UUID: {}", response.getRoleName(), response.getRole_uuid());
                     return ResponseEntity.status(HttpStatus.CREATED).body(response);
                 })
-                .onErrorResume(error -> RolesServiceExceptionHandler.handleRoleCreationError(
-                        request.getRoleName(), organizationUuid, error));
+                .onErrorResume(error -> {
+                    log.error("BOOTSTRAP: Failed to create role: {} for organization: {} - {}", 
+                            request.getRoleName(), organizationUuid, error.getMessage());
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(new RoleResponse()));
+                });
     }
 
     @GetMapping("/bootstrap/system-managed")
@@ -343,8 +351,11 @@ public class RolesController {
                     log.info("BOOTSTRAP: Retrieved {} system managed roles", response.getRoles().size());
                     return ResponseEntity.ok(response.getRoles());
                 })
-                .onErrorResume(error -> RolesServiceExceptionHandler.handleRoleListError(
-                        "BOOTSTRAP system managed roles", error));
+                .onErrorResume(error -> {
+                    log.error("BOOTSTRAP: Failed to get system managed roles - {}", error.getMessage());
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(List.<RoleResponse>of()));
+                });
     }
 
     @PostMapping("/bootstrap/organization/{organizationUuid}/setup")
@@ -357,7 +368,7 @@ public class RolesController {
         return userRolesIntegrationService.createDefaultAdminRole(organizationUuid, adminUserUuid)
                 .flatMap(adminRole -> userRolesIntegrationService.createDefaultUserRole(organizationUuid, adminUserUuid)
                         .map(userRole -> adminRole))
-                .flatMap(adminRole -> userRolesIntegrationService.assignAdminRoleToUser(adminUserUuid, organizationUuid, "system")
+                .flatMap(adminRole -> userRolesIntegrationService.assignAdminRoleToUser(adminUserUuid, organizationUuid, "system", adminRole.getRole_uuid())
                         .thenReturn(adminRole))
                 .map(adminRole -> {
                     log.info("BOOTSTRAP: Organization setup complete for organization: {} with admin user: {}", organizationUuid, adminUserUuid);

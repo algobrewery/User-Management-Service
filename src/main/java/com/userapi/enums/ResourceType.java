@@ -9,16 +9,16 @@ public enum ResourceType {
     // Core system resources
     USERS("users", "User profile information"),
     ROLES("roles", "Role management data"),
-    ORGANIZATION("organization", "Organization settings"),
+    ORGANIZATIONS("organizations", "Organization settings"),
     
     // Business domain resources
     TASKS("tasks", "Task management data"),
     CLIENTS("clients", "Client/customer information"),
     
     // System resources
-    SYSTEM_ROLE("system_role", "System-level role management"),
-    USER_ROLE("user_role", "User-role assignment management"),
-    PERMISSION("permission", "Permission checking and validation"),
+    SYSTEM_ROLES("system_roles", "System-level role management"),
+    USER_ROLES("user_roles", "User-role assignment management"),
+    PERMISSIONS("permissions", "Permission checking and validation"),
     
     // Wildcard for admin access
     ALL("*", "Wildcard for all resources");

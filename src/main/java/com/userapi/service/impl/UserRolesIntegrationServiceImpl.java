@@ -2,7 +2,6 @@
 package com.userapi.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.userapi.models.entity.UserProfile;
 import com.userapi.models.external.roles.CreateRoleRequest;
 import com.userapi.models.external.roles.ListRolesFilterCriteria;
@@ -12,6 +11,7 @@ import com.userapi.models.external.roles.RoleResponse;
 import com.userapi.repository.userprofile.UserProfileRepository;
 import com.userapi.service.RolesServiceClient;
 import com.userapi.service.UserRolesIntegrationService;
+import com.userapi.util.PolicyBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,33 +26,18 @@ public class UserRolesIntegrationServiceImpl implements UserRolesIntegrationServ
 
     private final RolesServiceClient rolesServiceClient;
     private final UserProfileRepository userProfileRepository;
-    private final ObjectMapper objectMapper;
 
     @Override
     public Mono<RoleResponse> createDefaultAdminRole(String organizationUuid, String createdBy) {
         log.info("Creating default admin role for organization: {}", organizationUuid);
 
         try {
-            String adminPolicyString = """
-                {
-                  "version": "1.0",
-                  "data": {
-                    "read": ["*", "users", "roles", "organization", "tasks", "projects", "reports", "clients"],
-                    "write": ["*", "users", "roles", "organization", "tasks", "projects", "reports", "clients"],
-                    "delete": ["*", "users", "roles", "organization", "tasks", "projects", "reports", "clients"]
-                  },
-                  "features": {
-                    "execute": ["*", "view_reports", "create_task", "assign_tasks", "manage_team", "view_analytics", "export_data"]
-                  }
-                }
-                """;
-
-            JsonNode adminPolicy = objectMapper.readTree(adminPolicyString);
+            // Build admin policy dynamically using ResourceType enum
+            JsonNode adminPolicy = PolicyBuilder.buildAdminPolicy();
 
             CreateRoleRequest request = CreateRoleRequest.builder()
                     .roleName("Admin")
                     .description("Default admin role with full access")
-                    .organizationUuid(organizationUuid)
                     .roleManagementType("SYSTEM_MANAGED")
                     .policy(adminPolicy)
                     .build();
@@ -71,26 +56,12 @@ public class UserRolesIntegrationServiceImpl implements UserRolesIntegrationServ
         log.info("Creating default user role for organization: {}", organizationUuid);
 
         try {
-            String userPolicyString = """
-                {
-                  "version": "1.0",
-                  "data": {
-                    "read": ["users", "tasks", "clients", "organization"],
-                    "write": ["tasks"],
-                    "delete": []
-                  },
-                  "features": {
-                    "execute": ["create_task", "view_reports"]
-                  }
-                }
-                """;
-
-            JsonNode userPolicy = objectMapper.readTree(userPolicyString);
+            // Build user policy dynamically using ResourceType enum
+            JsonNode userPolicy = PolicyBuilder.buildUserPolicy();
 
             CreateRoleRequest request = CreateRoleRequest.builder()
                     .roleName("User")
                     .description("Default user role with limited access")
-                    .organizationUuid(organizationUuid)
                     .roleManagementType("SYSTEM_MANAGED")
                     .policy(userPolicy)
                     .build();
@@ -106,77 +77,54 @@ public class UserRolesIntegrationServiceImpl implements UserRolesIntegrationServ
 
     @Override
     public Mono<Void> assignAdminRoleToUser(String userUuid, String organizationUuid, String assignedBy) {
+        return assignAdminRoleToUser(userUuid, organizationUuid, assignedBy, null);
+    }
+
+    @Override
+    public Mono<Void> assignAdminRoleToUser(String userUuid, String organizationUuid, String assignedBy, String adminRoleUuid) {
         log.info("Assigning admin role to user: {} in organization: {}", userUuid, organizationUuid);
 
-        // First, try to get the admin role from organization-specific roles
-        ListRolesRequest orgRequest = ListRolesRequest.builder()
-                .filterCriteria(ListRolesFilterCriteria.builder()
-                        .attributes(List.of(
-                                ListRolesFilterCriteriaAttribute.builder()
-                                        .name("role_management_type")
-                                        .values(List.of("CUSTOMER_MANAGED"))
-                                        .build()
-                        ))
-                        .build())
-                .build();
-        
-        return rolesServiceClient.searchRoles(orgRequest, organizationUuid)
-                .flatMap(orgResponse -> {
-                    RoleResponse adminRole = orgResponse.getRoles().stream()
-                            .filter(role -> "Admin".equals(role.getName()))
+        // If we have a specific admin role UUID (from bootstrap), use it directly
+        if (adminRoleUuid != null) {
+            log.info("Using provided admin role UUID: {}", adminRoleUuid);
+            return rolesServiceClient.assignRoleToUser(userUuid, adminRoleUuid, organizationUuid)
+                    .doOnSuccess(response -> log.info("Admin role {} assigned successfully to user: {}", adminRoleUuid, userUuid))
+                    .doOnError(error -> log.error("Failed to assign admin role {} to user: {}", adminRoleUuid, userUuid));
+        }
+
+        // Since the search endpoint is not working, we'll use the system-managed roles endpoint
+        // which should return all available roles including the newly created admin role
+        return rolesServiceClient.getSystemManagedRoles()
+                .flatMap(systemRoles -> {
+                    // Log all available system-managed roles for debugging
+                    log.info("Available system-managed roles:");
+                    systemRoles.forEach(role -> log.info("  - Role: '{}' (UUID: {})", role.getRoleName(), role.getRole_uuid()));
+
+                    // Try to find admin role with different possible names
+                    RoleResponse adminRole = systemRoles.stream()
+                            .filter(role -> {
+                                String roleName = role.getRoleName();
+                                return roleName != null && (
+                                    "Admin".equalsIgnoreCase(roleName) ||
+                                    "Administrator".equalsIgnoreCase(roleName) ||
+                                    "Organization Administrator".equalsIgnoreCase(roleName) ||
+                                    "admin".equals(roleName) ||
+                                    "ADMIN".equals(roleName) ||
+                                    roleName.toLowerCase().contains("admin") ||
+                                    roleName.toLowerCase().contains("administrator")
+                                );
+                            })
                             .findFirst()
                             .orElse(null);
 
                     if (adminRole != null) {
-                        log.info("Found organization-specific admin role: {}", adminRole.getRole_uuid());
+                        log.info("Found system-managed admin role: '{}' (UUID: {})", adminRole.getRoleName(), adminRole.getRole_uuid());
                         return rolesServiceClient.assignRoleToUser(userUuid, adminRole.getRole_uuid(), organizationUuid);
+                    } else {
+                        log.error("No admin role found in system-managed roles. Available roles: {}", 
+                                systemRoles.stream().map(RoleResponse::getRoleName).toList());
+                        return Mono.error(new RuntimeException("Admin role not found"));
                     }
-
-                    // If no organization-specific admin role found, try system-managed roles
-                    log.info("No organization-specific admin role found, checking system-managed roles");
-                    ListRolesRequest systemRequest = ListRolesRequest.builder()
-                            .filterCriteria(ListRolesFilterCriteria.builder()
-                                    .attributes(List.of(
-                                            ListRolesFilterCriteriaAttribute.builder()
-                                                    .name("role_management_type")
-                                                    .values(List.of("SYSTEM_MANAGED"))
-                                                    .build()
-                                    ))
-                                    .build())
-                            .build();
-                    
-                    return rolesServiceClient.searchRoles(systemRequest, organizationUuid)
-                            .flatMap(systemResponse -> {
-                                // Log all available system roles for debugging
-                                log.info("Available system-managed roles:");
-                                systemResponse.getRoles().forEach(role -> log.info("  - Role: '{}' (UUID: {})", role.getName(), role.getRole_uuid()));
-
-                                // Try to find admin role with different possible names
-                                RoleResponse systemAdminRole = systemResponse.getRoles().stream()
-                                        .filter(role -> {
-                                            String roleName = role.getName();
-                                            return roleName != null && (
-                                                "Admin".equalsIgnoreCase(roleName) ||
-                                                "Administrator".equalsIgnoreCase(roleName) ||
-                                                "Organization Administrator".equalsIgnoreCase(roleName) ||
-                                                "admin".equals(roleName) ||
-                                                "ADMIN".equals(roleName) ||
-                                                roleName.toLowerCase().contains("admin") ||
-                                                roleName.toLowerCase().contains("administrator")
-                                            );
-                                        })
-                                        .findFirst()
-                                        .orElse(null);
-
-                                if (systemAdminRole == null) {
-                                    log.error("Admin role not found in organization or system-managed roles. Available roles: {}", 
-                                            systemResponse.getRoles().stream().map(RoleResponse::getName).toList());
-                                    return Mono.error(new RuntimeException("Admin role not found"));
-                                }
-
-                                log.info("Found system-managed admin role: '{}' (UUID: {})", systemAdminRole.getName(), systemAdminRole.getRole_uuid());
-                                return rolesServiceClient.assignRoleToUser(userUuid, systemAdminRole.getRole_uuid(), organizationUuid);
-                            });
                 })
                 .doOnSuccess(response -> log.info("Admin role assigned successfully to user: {}", userUuid))
                 .doOnError(error -> log.error("Failed to assign admin role to user: {}", error.getMessage()));
@@ -186,31 +134,58 @@ public class UserRolesIntegrationServiceImpl implements UserRolesIntegrationServ
     public Mono<Void> assignUserRoleToUser(String userUuid, String organizationUuid, String assignedBy) {
         log.info("Assigning user role to user: {} in organization: {}", userUuid, organizationUuid);
         
-        // First, get the user role for the organization
-        ListRolesRequest userRequest = ListRolesRequest.builder()
+        // First, try to get the user role from system-managed roles (since we create them as SYSTEM_MANAGED)
+        ListRolesRequest systemRequest = ListRolesRequest.builder()
                 .filterCriteria(ListRolesFilterCriteria.builder()
                         .attributes(List.of(
                                 ListRolesFilterCriteriaAttribute.builder()
                                         .name("role_management_type")
-                                        .values(List.of("CUSTOMER_MANAGED"))
+                                        .values(List.of("SYSTEM_MANAGED"))
                                         .build()
                         ))
                         .build())
                 .build();
         
-        return rolesServiceClient.searchRoles(userRequest, organizationUuid)
-                .flatMap(response -> {
-                    RoleResponse userRole = response.getRoles().stream()
-                            .filter(role -> "User".equals(role.getName()))
+        return rolesServiceClient.searchRoles(systemRequest, organizationUuid)
+                .flatMap(systemResponse -> {
+                    RoleResponse systemUserRole = systemResponse.getRoles().stream()
+                            .filter(role -> "User".equals(role.getRoleName()))
                             .findFirst()
                             .orElse(null);
                     
-                    if (userRole == null) {
-                        log.error("User role not found for organization: {}", organizationUuid);
-                        return Mono.error(new RuntimeException("User role not found"));
+                    if (systemUserRole != null) {
+                        log.info("Found system-managed user role: {}", systemUserRole.getRole_uuid());
+                        return rolesServiceClient.assignRoleToUser(userUuid, systemUserRole.getRole_uuid(), organizationUuid);
                     }
                     
-                    return rolesServiceClient.assignRoleToUser(userUuid, userRole.getRole_uuid(), organizationUuid);
+                    // If no system-managed user role found, try customer-managed roles
+                    log.info("No system-managed user role found, checking customer-managed roles");
+                    ListRolesRequest userRequest = ListRolesRequest.builder()
+                            .filterCriteria(ListRolesFilterCriteria.builder()
+                                    .attributes(List.of(
+                                            ListRolesFilterCriteriaAttribute.builder()
+                                                    .name("role_management_type")
+                                                    .values(List.of("CUSTOMER_MANAGED"))
+                                                    .build()
+                                    ))
+                                    .build())
+                            .build();
+                    
+                    return rolesServiceClient.searchRoles(userRequest, organizationUuid)
+                            .flatMap(response -> {
+                                RoleResponse userRole = response.getRoles().stream()
+                                        .filter(role -> "User".equals(role.getRoleName()))
+                                        .findFirst()
+                                        .orElse(null);
+                                
+                                if (userRole == null) {
+                                    log.error("User role not found in system-managed or customer-managed roles for organization: {}", organizationUuid);
+                                    return Mono.error(new RuntimeException("User role not found"));
+                                }
+                                
+                                log.info("Found customer-managed user role: {}", userRole.getRole_uuid());
+                                return rolesServiceClient.assignRoleToUser(userUuid, userRole.getRole_uuid(), organizationUuid);
+                            });
                 })
                 .doOnSuccess(response -> log.info("User role assigned successfully to user: {}", userUuid))
                 .doOnError(error -> log.error("Failed to assign user role to user: {}", error.getMessage()));
@@ -255,7 +230,7 @@ public class UserRolesIntegrationServiceImpl implements UserRolesIntegrationServ
 
         return getUserRoles(userUuid, organizationUuid)
                 .map(roles -> roles.stream()
-                        .anyMatch(role -> "Admin".equals(role.getName())))
+                        .anyMatch(role -> "Admin".equals(role.getRoleName())))
                 .defaultIfEmpty(false)
                 .doOnSuccess(isAdmin -> log.info("User {} is admin: {} in organization: {}", 
                         userUuid, isAdmin, organizationUuid))

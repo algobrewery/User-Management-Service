@@ -2,6 +2,7 @@ package com.userapi.models.external.roles;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.userapi.enums.RoleStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -37,15 +38,8 @@ public class RoleResponse {
     @JsonProperty("created_by")
     private String created_by;
 
-    // Backward compatibility method - Lombok @Data already generates all getters/setters
-    public String getName() {
-        return roleName;
-    }
+    // Lombok @Data automatically generates all getters/setters including getName() and setName()
 
-    public void setName(String name) {
-        this.roleName = name;
-    }
-
-    // Legacy fields for backward compatibility
-    private Boolean is_active;
+    // Role status using enum for better type safety and extensibility
+    private RoleStatus roleStatus;
 }

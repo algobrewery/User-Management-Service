@@ -17,12 +17,17 @@ public class ListRolesRequest {
     private ListRolesFilterCriteria filterCriteria;
     private ListRolesSelector selector;
 
-    @Min(value = 0, message = "Page number must be greater than or equal to 0")
-    private Integer page = 0;
+    @Min(value = 1, message = "Page number must be greater than or equal to 1")
+    @Builder.Default
+    private Integer page = 1;
 
     @Min(value = 1, message = "Page size must be greater than 0")
+    @Builder.Default
     private Integer size = 10;
 
+    @Builder.Default
     private String sortBy = "roleName";
+    
+    @Builder.Default
     private String sortDirection = "asc";
 }

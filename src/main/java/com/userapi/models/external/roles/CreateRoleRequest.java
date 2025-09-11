@@ -12,6 +12,10 @@ import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 
+/**
+ * Request model for creating new roles.
+ * Organization context is provided via x-app-org-uuid header, not in request body.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -30,22 +34,11 @@ public class CreateRoleRequest {
     @Size(max = 255, message = "Description must not exceed 255 characters")
     private String description;
 
-    @JsonProperty("organization_uuid")
-    private String organizationUuid;
-
     @JsonProperty("role_management_type")
     private String roleManagementType;
 
     @NotNull(message = "Policy is required")
     private JsonNode policy;
 
-    // Custom getter to map name to roleName for backward compatibility
-    public String getName() {
-        return this.roleName;
-    }
-
-    // Custom setter to map name to roleName for backward compatibility
-    public void setName(String name) {
-        this.roleName = name;
-    }
+    // Lombok @Data automatically generates all getters/setters including getRoleName() and setRoleName()
 }

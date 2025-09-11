@@ -1,6 +1,5 @@
 package com.userapi.service;
 
-import com.userapi.models.external.roles.CreateRoleRequest;
 import com.userapi.models.external.roles.RoleResponse;
 import reactor.core.publisher.Mono;
 
@@ -22,6 +21,11 @@ public interface UserRolesIntegrationService {
      * Assign admin role to a user
      */
     Mono<Void> assignAdminRoleToUser(String userUuid, String organizationUuid, String assignedBy);
+    
+    /**
+     * Assign admin role to a user with specific admin role UUID
+     */
+    Mono<Void> assignAdminRoleToUser(String userUuid, String organizationUuid, String assignedBy, String adminRoleUuid);
     
     /**
      * Assign user role to a user

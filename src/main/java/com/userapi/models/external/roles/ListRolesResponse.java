@@ -17,6 +17,4 @@ public class ListRolesResponse {
     private int totalPages;
     private int currentPage;
     private int pageSize;
-    private boolean hasNext;
-    private boolean hasPrevious;
 }

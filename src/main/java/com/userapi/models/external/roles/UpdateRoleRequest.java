@@ -2,6 +2,7 @@ package com.userapi.models.external.roles;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.userapi.enums.RoleStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -33,7 +34,8 @@ public class UpdateRoleRequest {
     private JsonNode policy;
 
     /**
-     * Role active status - allows enabling/disabling the role
+     * Role status - defines the current state of the role
+     * Valid values: ACTIVE, INACTIVE, DELETED, SUSPENDED
      */
-    private Boolean is_active;
+    private RoleStatus status;
 }

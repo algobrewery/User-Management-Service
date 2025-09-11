@@ -1,5 +1,6 @@
 package com.userapi.config;
 
+import com.userapi.enums.PermissionResult;
 import com.userapi.service.ApiKeyAuthenticationService;
 import com.userapi.service.RolesServiceClient;
 import com.userapi.models.external.roles.PermissionCheckRequest;
@@ -67,7 +68,7 @@ public class TestSecurityConfig {
         
         // Mock permission check to always return true for integration tests
         PermissionCheckResponse mockResponse = PermissionCheckResponse.builder()
-                .has_permission(true)
+                .result(PermissionResult.ACCEPTED)
                 .build();
         
         Mockito.when(mockService.checkPermission(Mockito.any(PermissionCheckRequest.class)))

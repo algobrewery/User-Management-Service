@@ -1,10 +1,10 @@
 package com.userapi.service.impl;
 
+import com.userapi.enums.RoleStatus;
 import com.userapi.models.external.roles.*;
 import com.userapi.service.RolesServiceClient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -20,12 +20,9 @@ import java.util.stream.Collectors;
 public class RolesServiceClientImpl implements RolesServiceClient {
 
     private final WebClient webClient;
-    private final String baseUrl;
 
     public RolesServiceClientImpl(
-            @Qualifier("rolesServiceWebClient") WebClient webClient,
-            @Value("${roles.service.url:http://localhost:8081}") String baseUrl) {
-        this.baseUrl = baseUrl;
+            @Qualifier("rolesServiceWebClient") WebClient webClient) {
         this.webClient = webClient;
     }
 
@@ -43,8 +40,8 @@ public class RolesServiceClientImpl implements RolesServiceClient {
                 .bodyToMono(RoleResponse.class)  // Changed to return RoleResponse
                 .map(response -> {
                     // Map the name from request to name in response
-                    if (response.getName() == null && request.getRoleName() != null) {
-                        response.setName(request.getRoleName());
+                    if (response.getRoleName() == null && request.getRoleName() != null) {
+                        response.setRoleName(request.getRoleName());
                     }
                     // Set organization_uuid if null
                     if (response.getOrganization_uuid() == null) {
@@ -54,13 +51,13 @@ public class RolesServiceClientImpl implements RolesServiceClient {
                     if (response.getCreated_by() == null) {
                         response.setCreated_by("system-user");
                     }
-                    // Set is_active if null
-                    if (response.getIs_active() == null) {
-                        response.setIs_active(true);
+                    // Set roleStatus if null
+                    if (response.getRoleStatus() == null) {
+                        response.setRoleStatus(RoleStatus.ACTIVE);
                     }
                     return response;
                 })
-                .doOnSuccess(response -> log.info("Role created successfully: {} with name: {}", response.getRole_uuid(), response.getName()))
+                .doOnSuccess(response -> log.info("Role created successfully: {} with name: {}", response.getRole_uuid(), response.getRoleName()))
                 .doOnError(error -> {
                     log.error("Failed to create role: {}", error.getMessage());
                     if (error instanceof WebClientResponseException) {
@@ -87,11 +84,22 @@ public class RolesServiceClientImpl implements RolesServiceClient {
     public Mono<List<RoleResponse>> getOrganizationRoles(String organizationUuid) {
         log.info("Getting roles for organization: {}", organizationUuid);
         
-        return webClient.get()
-                .uri("/role/organization/{orgUuid}", organizationUuid)
-                .header("x-app-user-uuid", "system-user") // Add missing user UUID header
+        // Use the search endpoint with organization context in headers (no filter criteria)
+        // The roles service will return all roles for the organization based on the header
+        ListRolesRequest request = ListRolesRequest.builder()
+                .filterCriteria(ListRolesFilterCriteria.builder()
+                        .attributes(List.of())
+                        .build())
+                .build();
+        
+        return webClient.post()
+                .uri("/role/search")
+                .header("x-app-org-uuid", organizationUuid) // Organization context via header
+                .header("x-app-user-uuid", "system-user") // GitHub service expects this header
+                .bodyValue(request)
                 .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<List<RoleResponse>>() {})
+                .bodyToMono(ListRolesResponse.class)
+                .map(response -> response.getRoles())
                 .doOnSuccess(roles -> log.info("Retrieved {} roles for organization: {}", roles.size(), organizationUuid))
                 .doOnError(error -> log.error("Failed to get organization roles: {}", error.getMessage()));
     }
@@ -118,9 +126,8 @@ public class RolesServiceClientImpl implements RolesServiceClient {
                 .flatMap(currentRole -> {
                     // Create a CreateRoleRequest with current role data and updated fields
                     CreateRoleRequest updateRequest = CreateRoleRequest.builder()
-                            .roleName(currentRole.getName()) // Preserve role name
+                            .roleName(currentRole.getRoleName()) // Preserve role name
                             .description(request.getDescription() != null ? request.getDescription() : currentRole.getDescription())
-                            .organizationUuid(currentRole.getOrganization_uuid()) // Preserve organization
                             .roleManagementType(currentRole.getRole_management_type()) // Preserve management type
                             .policy(request.getPolicy() != null ? request.getPolicy() : currentRole.getPolicy())
                             .build();
@@ -137,10 +144,10 @@ public class RolesServiceClientImpl implements RolesServiceClient {
                             .retrieve()
                             .bodyToMono(RoleResponse.class)
                             .map(response -> {
-                                // Handle is_active field if it was provided in the update request
-                                if (request.getIs_active() != null) {
-                                    response.setIs_active(request.getIs_active());
-                                    log.info("Updated is_active field to: {}", request.getIs_active());
+                                // Handle status field if it was provided in the update request
+                                if (request.getStatus() != null) {
+                                    response.setRoleStatus(request.getStatus());
+                                    log.info("Updated status field to: {}", request.getStatus());
                                 }
                                 return response;
                             })
@@ -203,8 +210,9 @@ public class RolesServiceClientImpl implements RolesServiceClient {
         log.info("Getting roles for user: {} in organization: {}", userUuid, organizationUuid);
 
         return webClient.get()
-                .uri("/user/{userUuid}/roles?organization_uuid={organizationUuid}", userUuid, organizationUuid)
+                .uri("/user/{userUuid}/roles", userUuid)
                 .header("x-app-user-uuid", "system-user") // Add missing user UUID header
+                .header("x-app-org-uuid", organizationUuid) // Add organization UUID header
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<List<RoleResponse>>() {})
                 .flatMapMany(Flux::fromIterable) // Convert to Flux for individual processing
@@ -227,9 +235,9 @@ public class RolesServiceClientImpl implements RolesServiceClient {
         log.info("Removing role: {} from user: {} in organization: {}", roleUuid, userUuid, organizationUuid);
         
         return webClient.delete()
-                .uri("/user/{userUuid}/roles/{roleUuid}?organization_uuid={organizationUuid}", 
-                     userUuid, roleUuid, organizationUuid)
+                .uri("/user/{userUuid}/roles/{roleUuid}", userUuid, roleUuid)
                 .header("x-app-user-uuid", "system-user") // Add missing user UUID header
+                .header("x-app-org-uuid", organizationUuid) // Add organization UUID header
                 .retrieve()
                 .bodyToMono(Void.class)
                 .doOnSuccess(response -> log.info("Role removed successfully from user: {}", userUuid))
@@ -246,7 +254,7 @@ public class RolesServiceClientImpl implements RolesServiceClient {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(PermissionCheckResponse.class)
-                .doOnSuccess(response -> log.info("Permission check result: {}", response.getHas_permission()))
+                .doOnSuccess(response -> log.info("Permission check result: {}", response.getResult()))
                 .doOnError(error -> log.error("Failed to check permission: {}", error.getMessage()));
     }
 
@@ -264,7 +272,7 @@ public class RolesServiceClientImpl implements RolesServiceClient {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(PermissionCheckResponse.class)
-                .map(PermissionCheckResponse::getHas_permission)
+                .map(response -> response.getResult() == com.userapi.enums.PermissionResult.ACCEPTED)
                 .defaultIfEmpty(false)
                 .doOnSuccess(result -> log.info("Permission check result: {} for user: {} on resource: {} with action: {}", 
                         result, userUuid, resource, action))
@@ -290,9 +298,22 @@ public class RolesServiceClientImpl implements RolesServiceClient {
                     .anyMatch(attr -> ("roleManagementType".equals(attr.getName()) || "role_management_type".equals(attr.getName())) && 
                             attr.getValues().contains("CUSTOMER_MANAGED"));
             
-            if (isSystemManaged) {
-                log.info("Filtering for system-managed roles");
-                rolesMono = getSystemManagedRoles();
+            // Check if filtering for both system-managed and customer-managed (organization-specific roles)
+            boolean isBothTypes = isSystemManaged && isCustomerManaged;
+            
+            if (isBothTypes) {
+                // When searching for both types, get organization-specific roles (both SYSTEM_MANAGED and CUSTOMER_MANAGED for the organization)
+                log.info("Filtering for both system-managed and customer-managed roles for organization: {}", organizationUuid);
+                rolesMono = getOrganizationRoles(organizationUuid);
+            } else if (isSystemManaged && !isCustomerManaged) {
+                // Only system-managed roles - check if this is for global roles or organization-specific
+                if ("system".equals(organizationUuid)) {
+                    log.info("Filtering for global system-managed roles");
+                    rolesMono = getSystemManagedRoles();
+                } else {
+                    log.info("Filtering for organization-specific system-managed roles for organization: {}", organizationUuid);
+                    rolesMono = getOrganizationRoles(organizationUuid);
+                }
             } else if (isCustomerManaged) {
                 log.info("Filtering for customer-managed roles for organization: {}", organizationUuid);
                 rolesMono = getOrganizationRoles(organizationUuid);
@@ -337,10 +358,10 @@ public class RolesServiceClientImpl implements RolesServiceClient {
                         }
                     }
                     
-                    // Apply pagination
-                    int page = request.getPage() != null ? request.getPage() : 0;
+                    // Apply pagination (1-based page numbers)
+                    int page = request.getPage() != null ? request.getPage() : 1;
                     int size = request.getSize() != null ? request.getSize() : 10;
-                    int startIndex = page * size;
+                    int startIndex = (page - 1) * size; // Convert to 0-based index
                     int endIndex = Math.min(startIndex + size, filteredRoles.size());
                     
                     List<RoleResponse> paginatedRoles = filteredRoles.subList(startIndex, endIndex);
@@ -348,8 +369,6 @@ public class RolesServiceClientImpl implements RolesServiceClient {
                     // Calculate pagination info
                     long totalElements = filteredRoles.size();
                     int totalPages = (int) Math.ceil((double) totalElements / size);
-                    boolean hasNext = page < totalPages - 1;
-                    boolean hasPrevious = page > 0;
                     
                     return ListRolesResponse.builder()
                             .roles(paginatedRoles)
@@ -357,8 +376,6 @@ public class RolesServiceClientImpl implements RolesServiceClient {
                             .totalPages(totalPages)
                             .currentPage(page)
                             .pageSize(size)
-                            .hasNext(hasNext)
-                            .hasPrevious(hasPrevious)
                             .build();
                 })
                 .doOnSuccess(response -> log.info("Found {} roles for organization: {}", response.getTotalElements(), organizationUuid))
@@ -385,7 +402,7 @@ public class RolesServiceClientImpl implements RolesServiceClient {
         switch (attributeName) {
             case "roleName":
             case "role_name":
-                return values.contains(role.getName());
+                return values.contains(role.getRoleName());
             case "roleManagementType":
             case "role_management_type":
                 return values.contains(role.getRole_management_type());

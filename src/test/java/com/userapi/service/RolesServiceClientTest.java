@@ -2,6 +2,8 @@ package com.userapi.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.userapi.enums.PermissionResult;
+import com.userapi.enums.RoleStatus;
 import com.userapi.models.external.roles.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,12 +38,12 @@ class RolesServiceClientTest {
                 .role_uuid("test-uuid")
                 .name("Test Role")
                 .status("success")
-                .is_active(true)
+                .roleStatus(RoleStatus.ACTIVE)
                 .build();
 
         assert response.getRole_uuid().equals("test-uuid");
         assert response.getName().equals("Test Role");
-        assert response.getIs_active().equals(true);
+        assert response.isActive() == true;
     }
 
     @Test
@@ -61,12 +63,12 @@ class RolesServiceClientTest {
     void testPermissionCheckResponseBuilder() {
         // Test the permission check response DTO builder
         PermissionCheckResponse response = PermissionCheckResponse.builder()
-                .has_permission(true)
+                .result(PermissionResult.ACCEPTED)
                 .resource("users")
                 .action("read")
                 .build();
 
-        assert response.getHas_permission().equals(true);
+        assert response.getResult() == PermissionResult.ACCEPTED;
         assert response.getResource().equals("users");
         assert response.getAction().equals("read");
     }
