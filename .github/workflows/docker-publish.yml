@@ -2,11 +2,11 @@ name: Build, Publish Docker Image and Deploy to ECS
 
 on:
   push:
-    branches: [ "main", "master", "user-roles" ]
+    branches: [ "main", "master" ]
     tags:
       - 'v*'
   pull_request:
-    branches: [ "main", "master", "user-roles" ]
+    branches: [ "main", "master" ]
   workflow_dispatch:
 
 permissions:
