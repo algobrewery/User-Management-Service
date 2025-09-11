@@ -99,6 +99,8 @@ jobs:
         with:
           role-to-assume: ${{ env.ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION_FALLBACK }}
+          audience: sts.amazonaws.com
+          output-env-credentials: true
 
       - name: Verify AWS identity
         run: aws sts get-caller-identity
