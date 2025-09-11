@@ -25,7 +25,7 @@ class RolesServiceClientTest {
                 .policy(policy)
                 .build();
 
-        assert request.getName().equals("Test Role");
+        assert request.getRoleName().equals("Test Role");
         assert request.getDescription().equals("Test Description");
         assert request.getRoleManagementType().equals("CUSTOMER_MANAGED");
         assert request.getPolicy().equals(policy);
