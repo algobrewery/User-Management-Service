@@ -113,8 +113,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          platforms: linux/amd64
 
   # Stage 3: Deploy to Test Environment
   deploy-test:
@@ -192,6 +191,8 @@ jobs:
     runs-on: ubuntu-latest
     name: Integration Tests - Test Environment
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/user-roles' || github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master')
+    env:
+      ROLE_ARN: ${{ vars.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_TO_ASSUME || secrets.AWS_ROLE_ARN }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
