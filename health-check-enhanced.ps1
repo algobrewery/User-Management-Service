@@ -4,14 +4,16 @@
 param(
     [Parameter(Mandatory=$false)]
     [ValidateSet("test", "production")]
-    [string]$Environment = "production"
+    [string]$Environment = "production",
+    [Parameter(Mandatory=$false)]
+    [string]$ApiUrl = ""
 )
 
 # Environment-specific configuration
 $ENVIRONMENT_CONFIG = @{
     "test" = @{
-        API_BASE_URL = "https://test-api.execute-api.us-east-1.amazonaws.com/test"
-        API_KEY = "test-api-key-12345"
+        API_BASE_URL = "https://rt786fxfde.execute-api.us-east-1.amazonaws.com/prod"
+        API_KEY = "pzKOjno8c-aLPvTz0L4b6U-UGDs7_7qq3W7qu7lpF7w"
         CLOUDWATCH_NAMESPACE = "UserManagementService/HealthCheck/Test"
         ECS_CLUSTER = "test-user-management-cluster"
         ECS_SERVICE = "test-user-management-service"
@@ -27,7 +29,7 @@ $ENVIRONMENT_CONFIG = @{
 
 # Get environment configuration
 $CONFIG = $ENVIRONMENT_CONFIG[$Environment]
-$API_BASE_URL = $CONFIG.API_BASE_URL
+$API_BASE_URL = if ($ApiUrl) { $ApiUrl } else { $CONFIG.API_BASE_URL }
 $API_KEY = $CONFIG.API_KEY
 $CLOUDWATCH_NAMESPACE = $CONFIG.CLOUDWATCH_NAMESPACE
 $ECS_CLUSTER = $CONFIG.ECS_CLUSTER
