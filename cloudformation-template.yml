@@ -45,7 +45,7 @@ Parameters:
     Description: Docker image URL for the User Management Service
   DBHost:
     Type: String
-    Default: user-management-prod-db.culss6gmw8na.us-east-1.rds.amazonaws.com
+    Default: nucleus-production.c6j42qq2krlk.us-east-1.rds.amazonaws.com
     Description: RDS database endpoint
   DBName:
     Type: String
