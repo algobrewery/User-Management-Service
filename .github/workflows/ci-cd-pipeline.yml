@@ -2,11 +2,11 @@ name: CI/CD Pipeline - User Management Service
 
 on:
   push:
-    branches: [ "main", "master", "user-roles" ]
+    branches: [ "main", "master" ]
     tags:
       - 'v*'
   pull_request:
-    branches: [ "main", "master", "user-roles" ]
+    branches: [ "main", "master" ]
   workflow_dispatch:
     inputs:
       environment:
@@ -24,7 +24,7 @@ permissions:
 
 env:
   DOCKER_REGISTRY: docker.io
-  IMAGE_NAME: sindhu030/user_role_production
+  IMAGE_NAME: sindhu030/user_management_service
   AWS_REGION: us-east-1
 
 jobs:
@@ -120,7 +120,7 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     name: Deploy to Test Environment
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/user-roles' || github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master')
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
     environment: test
     env:
       ROLE_ARN: arn:aws:iam::624160185248:role/github-actions-ecs-deployer
@@ -169,7 +169,7 @@ jobs:
     needs: deploy-test
     runs-on: ubuntu-latest
     name: Health Check - Test Environment
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/user-roles' || github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master')
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -194,7 +194,7 @@ jobs:
     needs: health-check-test
     runs-on: ubuntu-latest
     name: Integration Tests - Test Environment
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/user-roles' || github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master')
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
     env:
       ROLE_ARN: arn:aws:iam::624160185248:role/github-actions-ecs-deployer
     steps:
@@ -246,7 +246,7 @@ jobs:
     needs: [build-and-push, integration-tests]
     runs-on: ubuntu-latest
     name: Deploy to Production Environment
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/user-roles' || github.event_name == 'workflow_dispatch')
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
     environment: production
     env:
       ROLE_ARN: arn:aws:iam::624160185248:role/github-actions-ecs-deployer
@@ -302,7 +302,7 @@ jobs:
     needs: deploy-production
     runs-on: ubuntu-latest
     name: Post-deployment Tests - Production
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/user-roles' || github.event_name == 'workflow_dispatch')
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
