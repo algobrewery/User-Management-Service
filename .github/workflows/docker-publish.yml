@@ -108,7 +108,7 @@ jobs:
       - name: Run Health Check
         run: |
           echo "Running pre-deployment health check..."
-          pwsh ./health-check.ps1
+          pwsh ./health-check-enhanced.ps1 -Environment production
         env:
           AWS_DEFAULT_REGION: ${{ env.AWS_REGION_FALLBACK }}
 
