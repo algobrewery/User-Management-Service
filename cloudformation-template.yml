@@ -2,18 +2,35 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Deploy User Management Service on ECS Fargate with ALB and API Gateway - PRODUCTION Environment
 
 Parameters:
+  UseExistingVpc:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Whether to use an existing VPC (set to true if database is in existing VPC)
+  ExistingVpcId:
+    Type: String
+    Default: "vpc-01a3786d527f5d2ff"
+    Description: ID of existing VPC where database is located
+  ExistingSubnet1Id:
+    Type: String
+    Default: "subnet-031654e7ed0e658ed"
+    Description: ID of first existing subnet
+  ExistingSubnet2Id:
+    Type: String
+    Default: "subnet-0928526572637e612"
+    Description: ID of second existing subnet
   VpcCidr:
     Type: String
     Default: 10.0.0.0/16
-    Description: CIDR block for the VPC
+    Description: CIDR block for the VPC (only used if UseExistingVpc is false)
   PublicSubnet1Cidr:
     Type: String
     Default: 10.0.1.0/24
-    Description: CIDR block for the first public subnet
+    Description: CIDR block for the first public subnet (only used if UseExistingVpc is false)
   PublicSubnet2Cidr:
     Type: String
     Default: 10.0.2.0/24
-    Description: CIDR block for the second public subnet
+    Description: CIDR block for the second public subnet (only used if UseExistingVpc is false)
   ContainerPort:
     Type: Number
     Default: 8080
@@ -53,38 +70,16 @@ Parameters:
     AllowedValues: [production]
     Description: Environment name
 
+Conditions:
+  CreateNewVpc: !Equals [!Ref UseExistingVpc, "false"]
+  UseExistingVpc: !Equals [!Ref UseExistingVpc, "true"]
+
 Resources:
-  VPC:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: !Ref VpcCidr
-      EnableDnsSupport: true
-      EnableDnsHostnames: true
-      Tags:
-        - Key: Name
-          Value: !Sub '${Environment}-user-management-vpc'
+  # Using existing VPC where database is located
+  # VPC ID: vpc-01a3786d527f5d2ff
 
-  PublicSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: !Ref PublicSubnet1Cidr
-      AvailabilityZone: !Select [0, !GetAZs '']
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: !Sub '${Environment}-user-management-public-subnet-1'
-
-  PublicSubnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: !Ref PublicSubnet2Cidr
-      AvailabilityZone: !Select [1, !GetAZs '']
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: !Sub '${Environment}-user-management-public-subnet-2'
+  # Using existing subnets from the database VPC
+  # Subnet IDs: subnet-031654e7ed0e658ed, subnet-0928526572637e612
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
