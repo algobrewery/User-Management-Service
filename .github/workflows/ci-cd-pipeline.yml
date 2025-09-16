@@ -248,9 +248,49 @@ jobs:
         env:
           AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
 
-  # Stage 6: Notification
+  # Stage 6: API Testing
+  api-testing:
+    needs: [deploy-production, post-deployment-tests]
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    name: API Testing - Production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::624160185248:role/github-actions-ecs-deployer
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+          output-env-credentials: true
+
+      - name: Get Production Environment API Gateway URL
+        id: get-prod-url-api
+        run: |
+          API_URL=$(aws apigatewayv2 get-apis --query 'Items[?Name==`production-user-management-api`].ApiEndpoint' --output text)
+          echo "api-url=$API_URL" >> $GITHUB_OUTPUT
+          echo "Production API URL: $API_URL"
+
+      - name: Run Quick API Tests
+        run: |
+          echo "Running quick API tests..."
+          pwsh ./quick-api-test.ps1 -ApiUrl ${{ steps.get-prod-url-api.outputs.api-url }}
+        env:
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+
+      - name: Run Comprehensive API Tests
+        run: |
+          echo "Running comprehensive API tests..."
+          pwsh ./production-api-tests.ps1 -ApiUrl ${{ steps.get-prod-url-api.outputs.api-url }}
+        env:
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+        continue-on-error: true  # Don't fail pipeline if some API tests fail
+
+  # Stage 7: Notification
   notify:
-    needs: [build-and-push, deploy-test, health-check-test, deploy-production, post-deployment-tests]
+    needs: [build-and-push, deploy-test, health-check-test, deploy-production, post-deployment-tests, api-testing]
     runs-on: ubuntu-latest
     name: Send Notifications
     if: always()
@@ -261,6 +301,7 @@ jobs:
           echo "✅ Production deployment successful!"
           echo "Image: ${{ needs.build-and-push.outputs.image-tag }}"
           echo "Digest: ${{ needs.build-and-push.outputs.image-digest }}"
+          echo "API Testing: ${{ needs.api-testing.result }}"
 
       - name: Notify Failure
         if: ${{ needs.deploy-production.result == 'failure' }}
