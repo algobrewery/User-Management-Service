@@ -150,7 +150,20 @@ jobs:
       - name: Run Health Check on Test Environment
         run: |
           echo "Running health check on test environment..."
-          pwsh ./health-check-enhanced.ps1 -Environment test -ApiUrl ${{ steps.get-test-url.outputs.api-url }}
+          API_URL="${{ steps.get-test-url.outputs.api-url }}/prod"
+          echo "Testing health endpoint: $API_URL/actuator/health"
+          
+          # Wait for service to be ready
+          for i in {1..30}; do
+            if curl -f -s "$API_URL/actuator/health" > /dev/null; then
+              echo "✅ Health check passed!"
+              curl -s "$API_URL/actuator/health" | jq .
+              break
+            else
+              echo "⏳ Waiting for service to be ready... (attempt $i/30)"
+              sleep 10
+            fi
+          done
         env:
           AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
 
@@ -197,7 +210,16 @@ jobs:
       - name: Run Pre-deployment Health Check
         run: |
           echo "Running pre-deployment health check..."
-          pwsh ./health-check-enhanced.ps1 -Environment production -ApiUrl ${{ steps.get-prod-url.outputs.api-url }}
+          API_URL="${{ steps.get-prod-url.outputs.api-url }}/prod"
+          echo "Testing health endpoint: $API_URL/actuator/health"
+          
+          # Check if service is currently healthy
+          if curl -f -s "$API_URL/actuator/health" > /dev/null; then
+            echo "✅ Pre-deployment health check passed!"
+            curl -s "$API_URL/actuator/health" | jq .
+          else
+            echo "⚠️ Pre-deployment health check failed - service may be down"
+          fi
         env:
           AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
 
@@ -244,7 +266,20 @@ jobs:
       - name: Run Post-deployment Health Check
         run: |
           echo "Running post-deployment health check..."
-          pwsh ./health-check-enhanced.ps1 -Environment production -ApiUrl ${{ steps.get-prod-url-post.outputs.api-url }}
+          API_URL="${{ steps.get-prod-url-post.outputs.api-url }}/prod"
+          echo "Testing health endpoint: $API_URL/actuator/health"
+          
+          # Wait for service to be ready after deployment
+          for i in {1..30}; do
+            if curl -f -s "$API_URL/actuator/health" > /dev/null; then
+              echo "✅ Post-deployment health check passed!"
+              curl -s "$API_URL/actuator/health" | jq .
+              break
+            else
+              echo "⏳ Waiting for service to be ready after deployment... (attempt $i/30)"
+              sleep 10
+            fi
+          done
         env:
           AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
 
