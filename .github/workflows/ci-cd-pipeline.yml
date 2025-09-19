@@ -314,8 +314,8 @@ jobs:
 
   # Stage 7: Canary Tests (Production Monitoring)
   canary-tests:
-    # Only run canary tests on schedule or manual trigger, not on every push
-    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    # Run canary tests on schedule, manual trigger, or after successful deployment
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-latest
     name: Canary Tests - Production Monitoring
     steps:
@@ -413,8 +413,33 @@ jobs:
           # Test 3: System Roles (lightweight read operation)
           run_test "System Roles" "GET" "/role/bootstrap/system-managed" 200
           
-          # Test 4: List Users (lightweight read operation)
-          run_test "List Users" "POST" "/users/filter" 200
+          # Test 4: List Users (lightweight read operation with request body)
+          list_users_payload='{"page": 0, "size": 1}'
+          echo "Testing: List Users"
+          echo "  URL: $API_URL/users/filter"
+          echo "  Payload: $list_users_payload"
+          
+          TOTAL_TESTS=$((TOTAL_TESTS + 1))
+          test_start=$(date +%s%3N)
+          
+          if response=$(curl -s -w "\n%{http_code}" --max-time 10 "${headers[@]}" -X "POST" -d "$list_users_payload" "$API_URL/users/filter" 2>/dev/null); then
+            http_code=$(echo "$response" | tail -n1)
+            response_body=$(echo "$response" | head -n -1)
+            test_end=$(date +%s%3N)
+            duration=$((test_end - test_start))
+            
+            if [ "$http_code" -eq 200 ]; then
+              echo "  ✅ PASSED (${duration}ms)"
+              PASSED_TESTS=$((PASSED_TESTS + 1))
+            else
+              echo "  ❌ FAILED - Expected 200, got $http_code (${duration}ms)"
+              echo "  Response: $response_body"
+              FAILED_TESTS=$((FAILED_TESTS + 1))
+            fi
+          else
+            echo "  ❌ FAILED - Request timeout or connection error"
+            FAILED_TESTS=$((FAILED_TESTS + 1))
+          fi
           
           # Calculate results
           END_TIME=$(date +%s)
