@@ -8,6 +8,9 @@ on:
   pull_request:
     branches: [ "main", "master" ]
   workflow_dispatch:
+  schedule:
+    # Run canary tests every 5 minutes (configurable)
+    - cron: '*/30 * * * *'
 
 permissions:
   id-token: write
@@ -308,3 +311,160 @@ jobs:
         run: |
           echo "❌ Production deployment failed!"
           echo "Check the logs for details."
+
+  # Stage 7: Canary Tests (Production Monitoring)
+  canary-tests:
+    # Only run canary tests on schedule or manual trigger, not on every push
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    name: Canary Tests - Production Monitoring
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::624160185248:role/github-actions-ecs-deployer
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+          output-env-credentials: true
+
+      - name: Get Production API Gateway URL
+        id: get-prod-url-canary
+        run: |
+          API_URL=$(aws apigatewayv2 get-apis --query 'Items[?Name==`production-user-management-api`].ApiEndpoint' --output text)
+          echo "api-url=$API_URL" >> $GITHUB_OUTPUT
+          echo "Production API URL for canary tests: $API_URL"
+
+      - name: Run Canary Tests
+        run: |
+          echo "🔍 Starting canary tests for production monitoring..."
+          API_URL="${{ steps.get-prod-url-canary.outputs.api-url }}/prod"
+          API_KEY="pzKOjno8c-aLPvTz0L4b6U-UGDs7_7qq3W7qu7lpF7w"
+          ORG_UUID="cts"
+          ADMIN_USER_UUID="42388507-ec8f-47ef-a7c7-8ddb69763ac6"
+          
+          # Test results tracking
+          TOTAL_TESTS=0
+          PASSED_TESTS=0
+          FAILED_TESTS=0
+          START_TIME=$(date +%s)
+          
+          # Function to run a single test
+          run_test() {
+            local test_name="$1"
+            local method="$2"
+            local endpoint="$3"
+            local expected_status="${4:-200}"
+            local timeout="${5:-10}"
+            
+            TOTAL_TESTS=$((TOTAL_TESTS + 1))
+            test_start=$(date +%s%3N)
+            
+            echo "Testing: $test_name"
+            echo "  URL: $API_URL$endpoint"
+            
+            # Prepare headers
+            headers=(
+              -H "x-api-key: $API_KEY"
+              -H "x-app-org-uuid: $ORG_UUID"
+              -H "x-app-user-uuid: $ADMIN_USER_UUID"
+              -H "x-app-client-user-session-uuid: canary-session-$(date +%s)"
+              -H "x-app-trace-id: canary-trace-$(date +%s)"
+              -H "x-app-region-id: us-east-1"
+              -H "Content-Type: application/json"
+            )
+            
+            # Run the test
+            if response=$(curl -s -w "\n%{http_code}" --max-time $timeout "${headers[@]}" -X "$method" "$API_URL$endpoint" 2>/dev/null); then
+              http_code=$(echo "$response" | tail -n1)
+              response_body=$(echo "$response" | head -n -1)
+              test_end=$(date +%s%3N)
+              duration=$((test_end - test_start))
+              
+              if [ "$http_code" -eq "$expected_status" ]; then
+                echo "  ✅ PASSED (${duration}ms)"
+                PASSED_TESTS=$((PASSED_TESTS + 1))
+                return 0
+              else
+                echo "  ❌ FAILED - Expected $expected_status, got $http_code (${duration}ms)"
+                FAILED_TESTS=$((FAILED_TESTS + 1))
+                return 1
+              fi
+            else
+              echo "  ❌ FAILED - Request timeout or connection error"
+              FAILED_TESTS=$((FAILED_TESTS + 1))
+              return 1
+            fi
+          }
+          
+          # Run canary tests
+          echo ""
+          echo "🧪 Running canary tests..."
+          echo "=========================="
+          
+          # Test 1: Health Check (most critical)
+          run_test "Health Check" "GET" "/actuator/health" 200
+          
+          # Test 2: Application Info
+          run_test "Application Info" "GET" "/actuator/info" 200
+          
+          # Test 3: System Roles (lightweight read operation)
+          run_test "System Roles" "GET" "/role/bootstrap/system-managed" 200
+          
+          # Test 4: List Users (lightweight read operation)
+          run_test "List Users" "POST" "/users/filter" 200
+          
+          # Calculate results
+          END_TIME=$(date +%s)
+          TOTAL_DURATION=$((END_TIME - START_TIME))
+          SUCCESS_RATE=$((PASSED_TESTS * 100 / TOTAL_TESTS))
+          
+          echo ""
+          echo "📊 CANARY TEST RESULTS"
+          echo "====================="
+          echo "Total Tests: $TOTAL_TESTS"
+          echo "Passed: $PASSED_TESTS"
+          echo "Failed: $FAILED_TESTS"
+          echo "Success Rate: $SUCCESS_RATE%"
+          echo "Duration: ${TOTAL_DURATION}s"
+          echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          
+          # Set GitHub outputs for other jobs
+          echo "canary-total-tests=$TOTAL_TESTS" >> $GITHUB_OUTPUT
+          echo "canary-passed-tests=$PASSED_TESTS" >> $GITHUB_OUTPUT
+          echo "canary-failed-tests=$FAILED_TESTS" >> $GITHUB_OUTPUT
+          echo "canary-success-rate=$SUCCESS_RATE" >> $GITHUB_OUTPUT
+          echo "canary-duration=$TOTAL_DURATION" >> $GITHUB_OUTPUT
+          
+          # Determine overall status
+          if [ $FAILED_TESTS -eq 0 ]; then
+            echo "🎉 ALL CANARY TESTS PASSED! Production service is healthy."
+            echo "canary-status=success" >> $GITHUB_OUTPUT
+          elif [ $SUCCESS_RATE -ge 75 ]; then
+            echo "⚠️  MOST CANARY TESTS PASSED. Some issues detected but service is mostly healthy."
+            echo "canary-status=warning" >> $GITHUB_OUTPUT
+          else
+            echo "🚨 CANARY TESTS FAILED! Production service has issues."
+            echo "canary-status=failure" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+        env:
+          AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
+
+      - name: Send Canary Test Results to Slack (Optional)
+        if: always()
+        run: |
+          echo "📢 Canary test results:"
+          echo "Status: ${{ steps.canary-tests.outputs.canary-status }}"
+          echo "Success Rate: ${{ steps.canary-tests.outputs.canary-success-rate }}%"
+          echo "Duration: ${{ steps.canary-tests.outputs.canary-duration }}s"
+          echo ""
+          echo "💡 To set up Slack notifications, add SLACK_WEBHOOK_URL to repository secrets"
+          # Uncomment and configure if you want Slack notifications:
+          # if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+          #   curl -X POST -H 'Content-type: application/json' \
+          #     --data "{\"text\":\"🔍 Canary Test Results: ${{ steps.canary-tests.outputs.canary-status }} - Success Rate: ${{ steps.canary-tests.outputs.canary-success-rate }}%\"}" \
+          #     ${{ secrets.SLACK_WEBHOOK_URL }}
+          # fi

@@ -1,0 +1,66 @@
+# Canary Test Configuration
+# This file allows you to easily configure canary test settings
+
+# Test execution frequency (in minutes)
+# Options: 1, 2, 3, 4, 5, 10, 15, 30, 60
+# Default: 5 minutes
+canary_interval_minutes: 30
+
+# Test timeout per endpoint (in seconds)
+# Default: 10 seconds
+test_timeout_seconds: 10
+
+# API Configuration
+api:
+  base_url: "https://rt786fxfde.execute-api.us-east-1.amazonaws.com/prod"
+  api_key: "pzKOjno8c-aLPvTz0L4b6U-UGDs7_7qq3W7qu7lpF7w"
+  org_uuid: "cts"
+  admin_user_uuid: "42388507-ec8f-47ef-a7c7-8ddb69763ac6"
+
+# Test endpoints to monitor
+endpoints:
+  - name: "Health Check"
+    method: "GET"
+    path: "/actuator/health"
+    expected_status: 200
+    critical: true
+  
+  - name: "Application Info"
+    method: "GET"
+    path: "/actuator/info"
+    expected_status: 200
+    critical: false
+  
+  - name: "System Roles"
+    method: "GET"
+    path: "/role/bootstrap/system-managed"
+    expected_status: 200
+    critical: true
+  
+  - name: "List Users"
+    method: "POST"
+    path: "/users/filter"
+    expected_status: 200
+    critical: false
+
+# Alerting thresholds
+alerts:
+  # Success rate threshold (percentage)
+  success_rate_threshold: 75
+  
+  # Response time threshold (milliseconds)
+  response_time_threshold: 5000
+  
+  # Number of consecutive failures before alerting
+  consecutive_failures_threshold: 3
+
+# Notification settings
+notifications:
+  # Enable Slack notifications (requires SLACK_WEBHOOK_URL secret)
+  slack_enabled: false
+  
+  # Enable email notifications (requires EMAIL_SMTP settings)
+  email_enabled: false
+  
+  # Only send notifications on failures
+  failure_only: true
