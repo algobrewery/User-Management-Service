@@ -8,9 +8,9 @@ on:
   pull_request:
     branches: [ "main", "master" ]
   workflow_dispatch:
-  schedule:
-    # Run canary tests every 5 minutes (configurable)
-    - cron: '*/30 * * * *'
+  # schedule:
+    # Run canary tests every 30 minutes (configurable)
+    # - cron: '*/30 * * * *'
 
 permissions:
   id-token: write
