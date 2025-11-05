@@ -230,8 +230,8 @@ public class UserController {
         }
     }
 
-    @PostMapping("/bootstrap-organization-setup")
-    public ResponseEntity<CreateUserResponse> bootstrapOrganizationSetup(
+    @PostMapping("/bootstrap-organization-admin")
+    public ResponseEntity<CreateUserResponse> bootstrapOrganizationAdmin(
             @RequestHeader(APP_ORG_UUID) String orgUUID,
             @RequestHeader(APP_CLIENT_USER_SESSION_UUID) String clientUserSessionUUID,
             @RequestHeader(APP_TRACE_ID) String traceID,
