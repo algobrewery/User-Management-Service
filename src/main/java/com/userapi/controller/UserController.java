@@ -16,6 +16,7 @@ import com.userapi.models.internal.CreateUserInternalRequest;
 import com.userapi.models.internal.GetUserInternalRequest;
 import com.userapi.models.internal.UpdateUserInternalRequest;
 import com.userapi.service.UserService;
+import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -223,6 +224,57 @@ public class UserController {
             logger.error("Exception in deactivating user", e);
             return new ResponseEntity<>(
                     UpdateUserResponse.builder()
+                            .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .build(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PostMapping("/bootstrap/organization/{organizationUuid}/setup")
+    public ResponseEntity<CreateUserResponse> bootstrapOrganizationSetup(
+            @PathVariable String orgUUID,
+            @RequestHeader(APP_CLIENT_USER_SESSION_UUID) String clientUserSessionUUID,
+            @RequestHeader(APP_TRACE_ID) String traceID,
+            @RequestHeader(APP_REGION_ID) String regionID,
+            @Valid @RequestBody CreateUserRequest request) {
+
+        logger.info("Creating user for org: {}, traceId: {}", orgUUID, traceID);
+
+        CreateUserInternalRequest internalRequest = createUserRequestConverter.toInternal(
+                orgUUID,
+                Strings.EMPTY,
+                clientUserSessionUUID,
+                traceID,
+                regionID,
+                request);
+        try {
+            return userService.createUser(internalRequest)
+                    .thenApply(createUserResponseConverter::toExternal)
+                    .thenApply(r -> new ResponseEntity<>(r, r.getHttpStatus()))
+                    .get();
+        } catch (ExecutionException e) {
+            logger.error("Exception in creating user", e);
+            Throwable cause = e.getCause();
+            if (cause instanceof DuplicateResourceException) {
+                return new ResponseEntity<>(
+                        CreateUserResponse.builder()
+                                .message(cause.getMessage())
+                                .httpStatus(HttpStatus.BAD_REQUEST)
+                                .build(),
+                        HttpStatus.BAD_REQUEST);
+            }
+            return new ResponseEntity<>(
+                    CreateUserResponse.builder()
+                            .message(e.getMessage())
+                            .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .build(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch (InterruptedException e) {
+            logger.error("Exception in creating user", e);
+            Thread.currentThread().interrupt();
+            return new ResponseEntity<>(
+                    CreateUserResponse.builder()
+                            .message("Request interrupted")
                             .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                             .build(),
                     HttpStatus.INTERNAL_SERVER_ERROR);
