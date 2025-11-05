@@ -229,4 +229,55 @@ public class UserController {
                     HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+    @PostMapping("/bootstrap-organization-admin")
+    public ResponseEntity<CreateUserResponse> bootstrapOrganizationAdmin(
+            @RequestHeader(APP_ORG_UUID) String orgUUID,
+            @RequestHeader(APP_CLIENT_USER_SESSION_UUID) String clientUserSessionUUID,
+            @RequestHeader(APP_TRACE_ID) String traceID,
+            @RequestHeader(APP_REGION_ID) String regionID,
+            @Valid @RequestBody CreateUserRequest request) {
+
+        logger.info("Creating user for org: {}, traceId: {}", orgUUID, traceID);
+
+        CreateUserInternalRequest internalRequest = createUserRequestConverter.toInternal(
+                orgUUID,
+                Strings.EMPTY,
+                clientUserSessionUUID,
+                traceID,
+                regionID,
+                request);
+        try {
+            return userService.createUser(internalRequest)
+                    .thenApply(createUserResponseConverter::toExternal)
+                    .thenApply(r -> new ResponseEntity<>(r, r.getHttpStatus()))
+                    .get();
+        } catch (ExecutionException e) {
+            logger.error("Exception in creating user", e);
+            Throwable cause = e.getCause();
+            if (cause instanceof DuplicateResourceException) {
+                return new ResponseEntity<>(
+                        CreateUserResponse.builder()
+                                .message(cause.getMessage())
+                                .httpStatus(HttpStatus.BAD_REQUEST)
+                                .build(),
+                        HttpStatus.BAD_REQUEST);
+            }
+            return new ResponseEntity<>(
+                    CreateUserResponse.builder()
+                            .message(e.getMessage())
+                            .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .build(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch (InterruptedException e) {
+            logger.error("Exception in creating user", e);
+            Thread.currentThread().interrupt();
+            return new ResponseEntity<>(
+                    CreateUserResponse.builder()
+                            .message("Request interrupted")
+                            .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .build(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 }
