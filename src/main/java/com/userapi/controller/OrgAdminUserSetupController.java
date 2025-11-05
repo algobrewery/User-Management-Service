@@ -48,7 +48,7 @@ public class OrgAdminUserSetupController {
         this.userService = userService;
     }
 
-    @PostMapping("/bootstrap-organization-admin")
+    @PostMapping
     public ResponseEntity<CreateUserResponse> bootstrapOrganizationAdmin(
             @RequestHeader(APP_ORG_UUID) String orgUUID,
             @RequestHeader(APP_CLIENT_USER_SESSION_UUID) String clientUserSessionUUID,
