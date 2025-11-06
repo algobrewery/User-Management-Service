@@ -11,6 +11,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -41,6 +42,9 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             .and()
             
+            // Configure CORS to handle OPTIONS preflight requests
+            .cors().and()
+            
             // Configure authorization
             .authorizeRequests(authz -> authz
                 // Public endpoints
@@ -48,8 +52,8 @@ public class SecurityConfig {
                 .antMatchers("/health/**").permitAll()
                 .antMatchers("/swagger-ui/**").permitAll()
                 .antMatchers("/v3/api-docs/**").permitAll()
-                // Bootstrap endpoint - no authentication required
-                .antMatchers("/user/bootstrap-organization-admin").permitAll()
+                // Allow OPTIONS requests for CORS preflight
+                .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                 // All other endpoints require authentication
                 .anyRequest().authenticated()

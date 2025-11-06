@@ -36,8 +36,16 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         
         String apiKey = request.getHeader(API_KEY);
         String requestUri = request.getRequestURI();
+        String method = request.getMethod();
         
-        log.debug("Processing request to: {} with API key present: {}", requestUri, apiKey != null);
+        log.debug("Processing request to: {} with method: {} and API key present: {}", requestUri, method, apiKey != null);
+
+        // Skip authentication for OPTIONS requests (CORS preflight)
+        if ("OPTIONS".equalsIgnoreCase(method)) {
+            log.debug("Skipping API key authentication for OPTIONS request: {}", requestUri);
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         // Skip authentication for health check and actuator endpoints
         if (isPublicEndpoint(requestUri)) {
@@ -98,7 +106,6 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                requestUri.startsWith("/health") ||
                requestUri.equals("/") ||
                requestUri.startsWith("/swagger") ||
-               requestUri.startsWith("/v3/api-docs") ||
-               requestUri.equals("/user/bootstrap-organization-admin");
+               requestUri.startsWith("/v3/api-docs");
     }
 }

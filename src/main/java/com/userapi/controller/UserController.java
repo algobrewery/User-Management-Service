@@ -235,7 +235,7 @@ public class UserController {
     }
 
     @PostMapping("/bootstrap-organization-admin")
-    @PreAuthorize("permitAll()")
+    @PreAuthorize("hasRole('ROLE_API_CLIENT')")
     public ResponseEntity<CreateUserResponse> bootstrapOrganizationAdmin(
             @RequestHeader(APP_ORG_UUID) String orgUUID,
             @RequestHeader(APP_CLIENT_USER_SESSION_UUID) String clientUserSessionUUID,
