@@ -2,7 +2,6 @@ package com.userapi.service;
 
 import com.userapi.models.external.ListUsersRequest;
 import com.userapi.models.external.ListUsersResponse;
-import com.userapi.models.external.UpdateUserResponse;
 import com.userapi.models.external.UserHierarchyResponse;
 import com.userapi.models.internal.CreateUserInternalRequest;
 import com.userapi.models.internal.CreateUserInternalResponse;
