@@ -16,6 +16,7 @@ import com.userapi.models.internal.CreateUserInternalRequest;
 import com.userapi.models.internal.GetUserInternalRequest;
 import com.userapi.models.internal.UpdateUserInternalRequest;
 import com.userapi.service.UserService;
+import com.userapi.service.UserRolesIntegrationService;
 import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +57,7 @@ public class UserController {
     private final UpdateUserRequestConverter updateUserRequestConverter;
     private final UpdateUserResponseConverter updateUserResponseConverter;
     private final UserService userService;
+    private final UserRolesIntegrationService userRolesIntegrationService;
 
     @Autowired
     public UserController(
@@ -65,7 +67,8 @@ public class UserController {
             @Qualifier("GetUserResponseConverter") GetUserResponseConverter getUserResponseConverter,
             @Qualifier("UpdateUserRequestConverter") UpdateUserRequestConverter updateUserRequestConverter,
             @Qualifier("UpdateUserResponseConverter") UpdateUserResponseConverter updateUserResponseConverter,
-            UserService userService) {
+            UserService userService,
+            UserRolesIntegrationService userRolesIntegrationService) {
         this.createUserRequestConverter = createUserRequestConverter;
         this.createUserResponseConverter = createUserResponseConverter;
         this.getUserRequestConverter = getUserRequestConverter;
@@ -73,6 +76,7 @@ public class UserController {
         this.updateUserRequestConverter = updateUserRequestConverter;
         this.updateUserResponseConverter = updateUserResponseConverter;
         this.userService = userService;
+        this.userRolesIntegrationService = userRolesIntegrationService;
     }
 
     @PostMapping
@@ -231,6 +235,7 @@ public class UserController {
     }
 
     @PostMapping("/bootstrap-organization-admin")
+    @PreAuthorize("permitAll()")
     public ResponseEntity<CreateUserResponse> bootstrapOrganizationAdmin(
             @RequestHeader(APP_ORG_UUID) String orgUUID,
             @RequestHeader(APP_CLIENT_USER_SESSION_UUID) String clientUserSessionUUID,
@@ -238,7 +243,7 @@ public class UserController {
             @RequestHeader(APP_REGION_ID) String regionID,
             @Valid @RequestBody CreateUserRequest request) {
 
-        logger.info("Creating user for org: {}, traceId: {}", orgUUID, traceID);
+        logger.info("Bootstrap: Creating organization admin user for org: {}, traceId: {}", orgUUID, traceID);
 
         CreateUserInternalRequest internalRequest = createUserRequestConverter.toInternal(
                 orgUUID,
@@ -248,12 +253,70 @@ public class UserController {
                 regionID,
                 request);
         try {
-            return userService.createUser(internalRequest)
+            // Step 1: Create the user
+            CreateUserResponse userResponse = userService.createUser(internalRequest)
                     .thenApply(createUserResponseConverter::toExternal)
-                    .thenApply(r -> new ResponseEntity<>(r, r.getHttpStatus()))
                     .get();
+
+            logger.info("Bootstrap: User creation response - userId: {}, httpStatus: {}", 
+                    userResponse.getUserId(), userResponse.getHttpStatus());
+
+            // Step 2: If user creation successful, create admin role (if needed) and assign it
+            // Accept both CREATED (201) and OK (200) as success for bootstrap
+            boolean isSuccess = userResponse != null && userResponse.getUserId() != null && 
+                    userResponse.getHttpStatus() != null && 
+                    (userResponse.getHttpStatus() == HttpStatus.CREATED || userResponse.getHttpStatus() == HttpStatus.OK);
+            
+            if (isSuccess) {
+                logger.info("Bootstrap: User created successfully with ID: {}, now creating admin role and assigning it", userResponse.getUserId());
+                
+                try {
+                    // Step 2a: Create admin role if it doesn't exist
+                    logger.info("Bootstrap: Creating admin role for organization: {}", orgUUID);
+                    var adminRoleResponse = userRolesIntegrationService.createDefaultAdminRole(
+                            orgUUID,
+                            userResponse.getUserId()
+                    ).block(); // Blocking call since we're in a synchronous context
+                    
+                    if (adminRoleResponse != null && adminRoleResponse.getRole_uuid() != null) {
+                        logger.info("Bootstrap: Admin role created/retrieved with UUID: {}", adminRoleResponse.getRole_uuid());
+                        
+                        // Step 2b: Assign the admin role to the user
+                        logger.info("Bootstrap: Assigning admin role to user: {}", userResponse.getUserId());
+                        userRolesIntegrationService.assignAdminRoleToUser(
+                                userResponse.getUserId(),
+                                orgUUID,
+                                "system",
+                                adminRoleResponse.getRole_uuid()
+                        ).block(); // Blocking call since we're in a synchronous context
+                        
+                        logger.info("Bootstrap: Admin role successfully assigned to user: {}", userResponse.getUserId());
+                        
+                        // Update response message to indicate admin role was assigned
+                        userResponse.setMessage("Organization admin user created and admin role assigned successfully");
+                    } else {
+                        logger.error("Bootstrap: Failed to create/retrieve admin role for organization: {}", orgUUID);
+                        userResponse.setMessage("User created successfully, but admin role creation/assignment failed. " +
+                                "Please assign admin role manually using /role/bootstrap/user/{userId}/assign-admin endpoint");
+                    }
+                    
+                } catch (Exception roleException) {
+                    logger.error("Bootstrap: Failed to create/assign admin role to user: {} - {}", 
+                            userResponse.getUserId(), roleException.getMessage(), roleException);
+                    // User was created but role assignment failed - still return success but log the error
+                    userResponse.setMessage("User created successfully, but admin role assignment failed: " + 
+                            roleException.getMessage() + ". Please assign admin role manually using /role/bootstrap/user/{userId}/assign-admin endpoint");
+                }
+            } else {
+                logger.warn("Bootstrap: User creation response validation failed - userId: {}, httpStatus: {}", 
+                        userResponse != null ? userResponse.getUserId() : "null",
+                        userResponse != null && userResponse.getHttpStatus() != null ? userResponse.getHttpStatus() : "null");
+            }
+
+            return new ResponseEntity<>(userResponse, userResponse.getHttpStatus());
+            
         } catch (ExecutionException e) {
-            logger.error("Exception in creating user", e);
+            logger.error("Exception in creating bootstrap admin user", e);
             Throwable cause = e.getCause();
             if (cause instanceof DuplicateResourceException) {
                 return new ResponseEntity<>(
@@ -270,7 +333,7 @@ public class UserController {
                             .build(),
                     HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (InterruptedException e) {
-            logger.error("Exception in creating user", e);
+            logger.error("Exception in creating bootstrap admin user", e);
             Thread.currentThread().interrupt();
             return new ResponseEntity<>(
                     CreateUserResponse.builder()
