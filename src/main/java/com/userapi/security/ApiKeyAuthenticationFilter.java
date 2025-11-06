@@ -98,6 +98,7 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                requestUri.startsWith("/health") ||
                requestUri.equals("/") ||
                requestUri.startsWith("/swagger") ||
-               requestUri.startsWith("/v3/api-docs");
+               requestUri.startsWith("/v3/api-docs") ||
+               requestUri.equals("/user/bootstrap-organization-admin");
     }
 }

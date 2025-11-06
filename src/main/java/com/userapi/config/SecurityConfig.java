@@ -48,6 +48,8 @@ public class SecurityConfig {
                 .antMatchers("/health/**").permitAll()
                 .antMatchers("/swagger-ui/**").permitAll()
                 .antMatchers("/v3/api-docs/**").permitAll()
+                // Bootstrap endpoint - no authentication required
+                .antMatchers("/user/bootstrap-organization-admin").permitAll()
 
                 // All other endpoints require authentication
                 .anyRequest().authenticated()
