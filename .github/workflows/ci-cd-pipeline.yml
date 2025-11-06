@@ -226,11 +226,55 @@ jobs:
         env:
           AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
 
+      - name: Get Latest Task Definition
+        id: get-task-def
+        run: |
+          TASK_DEF=$(aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+            --query 'services[0].taskDefinition' \
+            --output text)
+          echo "task-definition=$TASK_DEF" >> $GITHUB_OUTPUT
+          echo "Current task definition: $TASK_DEF"
+
+      - name: Update Task Definition with New Image
+        id: update-task-def
+        run: |
+          # Get the current task definition
+          TASK_DEF_ARN="${{ steps.get-task-def.outputs.task-definition }}"
+          
+          # Get the task definition JSON
+          aws ecs describe-task-definition \
+            --task-definition $TASK_DEF_ARN \
+            --query 'taskDefinition' > task-definition.json
+          
+          # Extract the image name from the new image tag
+          NEW_IMAGE="${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          echo "Updating task definition with new image: $NEW_IMAGE"
+          
+          # Update the image in the task definition
+          cat task-definition.json | jq --arg IMAGE "$NEW_IMAGE" \
+            '.containerDefinitions[0].image = $IMAGE' > task-definition-updated.json
+          
+          # Remove fields that shouldn't be in register-task-definition
+          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            task-definition-updated.json > task-definition-final.json
+          
+          # Register new task definition
+          NEW_TASK_DEF=$(aws ecs register-task-definition \
+            --cli-input-json file://task-definition-final.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          
+          echo "task-definition-arn=$NEW_TASK_DEF" >> $GITHUB_OUTPUT
+          echo "New task definition registered: $NEW_TASK_DEF"
+
       - name: Deploy to Production ECS
         run: |
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
             --service ${{ env.ECS_SERVICE }} \
+            --task-definition ${{ steps.update-task-def.outputs.task-definition-arn }} \
             --force-new-deployment
 
       - name: Wait for Production deployment to complete
