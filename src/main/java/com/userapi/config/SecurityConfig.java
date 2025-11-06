@@ -42,9 +42,6 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             .and()
             
-            // Configure CORS to handle OPTIONS preflight requests
-            .cors().and()
-            
             // Configure authorization
             .authorizeRequests(authz -> authz
                 // Public endpoints
