@@ -101,7 +101,12 @@ public class PolicyBuilder {
         ArrayNode readArray = objectMapper.createArrayNode();
         ArrayNode writeArray = objectMapper.createArrayNode();
         ArrayNode deleteArray = objectMapper.createArrayNode();
-        
+
+        config.readResources.stream().map(ResourceType::getResourceName).forEach(readArray::add);
+        config.writeResources.stream().map(ResourceType::getResourceName).forEach(writeArray::add);
+        config.deleteResources.stream().map(ResourceType::getResourceName).forEach(deleteArray::add);
+
+        /*
         // Add wildcard if all resources are included
         if (config.readResources.contains(ResourceType.ALL) || 
             config.readResources.size() == ResourceType.values().length - 1) { // -1 to exclude ALL
@@ -135,6 +140,7 @@ public class PolicyBuilder {
                 }
             }
         }
+        */
         
         data.set("read", readArray);
         data.set("write", writeArray);
