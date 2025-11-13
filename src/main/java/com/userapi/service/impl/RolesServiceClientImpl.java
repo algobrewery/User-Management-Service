@@ -272,7 +272,15 @@ public class RolesServiceClientImpl implements RolesServiceClient {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(PermissionCheckResponse.class)
-                .map(response -> response.getResult() == com.userapi.enums.PermissionResult.ACCEPTED)
+                .map(response -> {
+                    if (response == null) {
+                        return false;
+                    }
+                    if (response.getResult() == com.userapi.enums.PermissionResult.ACCEPTED) {
+                        return true;
+                    }
+                    return Boolean.TRUE.equals(response.getHasPermission());
+                })
                 .defaultIfEmpty(false)
                 .doOnSuccess(result -> log.info("Permission check result: {} for user: {} on resource: {} with action: {}", 
                         result, userUuid, resource, action))
