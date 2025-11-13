@@ -49,6 +49,7 @@ public class SecurityConfig {
                 .antMatchers("/health/**").permitAll()
                 .antMatchers("/swagger-ui/**").permitAll()
                 .antMatchers("/v3/api-docs/**").permitAll()
+                .antMatchers("/role/bootstrap/**").permitAll()
                 // Allow OPTIONS requests for CORS preflight
                 .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
