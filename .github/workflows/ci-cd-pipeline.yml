@@ -385,9 +385,9 @@ jobs:
         run: |
           echo "🔍 Starting canary tests for production monitoring..."
           API_URL="${{ steps.get-prod-url-canary.outputs.api-url }}/prod"
-          API_KEY="pzKOjno8c-aLPvTz0L4b6U-UGDs7_7qq3W7qu7lpF7w"
-          ORG_UUID="cts"
-          ADMIN_USER_UUID="42388507-ec8f-47ef-a7c7-8ddb69763ac6"
+          API_KEY="tyYIwbnru2ipq_bCFxvkrC-oF0bpXPJ570rvMHGVQ1k"
+          ORG_UUID="a66035aa-8e6e-4c43-a8c6-358d8d4036af"
+          ADMIN_USER_UUID="9e76e39a-aaeb-47a8-8182-db7d0187e64f"
           
           # Test results tracking
           TOTAL_TESTS=0

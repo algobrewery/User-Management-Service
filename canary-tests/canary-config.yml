@@ -13,9 +13,9 @@ test_timeout_seconds: 10
 # API Configuration
 api:
   base_url: "https://rt786fxfde.execute-api.us-east-1.amazonaws.com/prod"
-  api_key: "pzKOjno8c-aLPvTz0L4b6U-UGDs7_7qq3W7qu7lpF7w"
-  org_uuid: "cts"
-  admin_user_uuid: "42388507-ec8f-47ef-a7c7-8ddb69763ac6"
+  api_key: "tyYIwbnru2ipq_bCFxvkrC-oF0bpXPJ570rvMHGVQ1k"
+  org_uuid: "a66035aa-8e6e-4c43-a8c6-358d8d4036af"
+  admin_user_uuid: "9e76e39a-aaeb-47a8-8182-db7d0187e64f"
 
 # Test endpoints to monitor
 endpoints:
